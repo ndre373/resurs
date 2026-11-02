@@ -16,12 +16,14 @@ export function EchoGame(props: { onDone: (r: GameResult) => void }) {
     const offState = controller.events.on<EchoHudState>("echo:state", setState);
     const offDone = controller.events.on<GameResult>("scene:done", props.onDone);
     controller.enterScene("echo");
+    controller.audio.setGameFocus(true); // music way down — the orb tones must lead
     voice.setContext("echo");
     voice.cue("Смотрите… слушайте… и повторяйте…", controller.audio.muted);
     return () => {
       offState();
       offDone();
       controller.exitScene();
+      controller.audio.setGameFocus(false);
       voice.stop();
       voice.setContext(null);
     };

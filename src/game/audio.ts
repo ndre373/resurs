@@ -106,6 +106,9 @@ export class AudioEngine {
   /** User music volume multiplier (0..1), persisted. Applied on top of the base gain. */
   musicVolume = 1;
   private duckFactor = 1;
+  /** Independent of voice ducking: games that live on sound cues (Echo, Rhythm)
+   *  pull the music bed way down so their tones stay clearly on top. */
+  private focusFactor = 1;
   /** 0 = deep calm … 1 = bright/active. Games push this; music follows. */
   energy = 0.3;
 
@@ -232,6 +235,12 @@ export class AudioEngine {
     this.updateMusicGain();
   }
 
+  /** Sound-driven games: music retreats to a quiet background while they run. */
+  setGameFocus(on: boolean): void {
+    this.focusFactor = on ? 0.22 : 1;
+    this.updateMusicGain();
+  }
+
   /** User music volume (0..1) — the settings slider drives this. */
   setMusicVolume(v: number): void {
     this.musicVolume = Math.min(1, Math.max(0, v));
@@ -241,7 +250,7 @@ export class AudioEngine {
 
   private updateMusicGain(): void {
     if (!this.ctx || !this.musicBus) return;
-    const target = MUSIC_BASE_GAIN * this.musicVolume * this.duckFactor;
+    const target = MUSIC_BASE_GAIN * this.musicVolume * this.duckFactor * this.focusFactor;
     this.musicBus.gain.setTargetAtTime(target, this.ctx.currentTime, 0.3);
   }
 
@@ -408,10 +417,12 @@ export class AudioEngine {
     }
   }
 
-  /** Public bell — used by games (Echo orbs, Mirror strokes) and by the generative layer. */
-  bell(at: number, freq: number, volume = 0.09): void {
+  /** Public bell — used by games (Echo orbs, Mirror strokes) and by the generative layer.
+   *  bus: gameplay cues belong on "sfx" (the loud channel); the generative bed stays on "music". */
+  bell(at: number, freq: number, volume = 0.09, bus: "music" | "sfx" = "music"): void {
     const ctx = this.ctx;
-    if (!ctx || !this.musicBus || this.muted) return;
+    const out = bus === "sfx" ? this.sfxBus : this.musicBus;
+    if (!ctx || !out || this.muted) return;
     const osc = ctx.createOscillator();
     osc.type = "sine";
     osc.frequency.value = freq;
@@ -426,7 +437,7 @@ export class AudioEngine {
     gain2.gain.value = 0.25;
     osc.connect(gain);
     osc2.connect(gain2).connect(gain);
-    gain.connect(this.musicBus);
+    gain.connect(out);
     osc.start(at);
     osc2.start(at);
     osc.stop(at + 2);
@@ -490,13 +501,13 @@ export class AudioEngine {
         tone("sine", 1760, 1760, 0.35, 0.04, 0.002);
         break;
       case "pluck":
-        this.bell(t, PENTA[(Math.random() * PENTA.length) | 0], 0.07);
+        this.bell(t, PENTA[(Math.random() * PENTA.length) | 0], 0.13, "sfx");
         break;
       case "tomL":
-        tone("sine", 150, 55, 0.18, 0.22, 0.002);
+        tone("sine", 150, 55, 0.18, 0.38, 0.002);
         break;
       case "tomR":
-        tone("sine", 240, 95, 0.14, 0.18, 0.002);
+        tone("sine", 240, 95, 0.14, 0.3, 0.002);
         break;
       case "whoosh":
         tone("sine", 300, 900, 0.4, 0.04, 0.15);

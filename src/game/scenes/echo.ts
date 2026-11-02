@@ -104,7 +104,8 @@ export class EchoScene implements GameScene {
   private flashOrb(i: number, loud: boolean): void {
     const orb = this.orbs[i];
     orb.flash = 0.45;
-    if (loud) this.ctx.audio.bell(this.ctx.audio.now(), ORB_FREQS[i], 0.12);
+    // gameplay cue → the loud sfx channel, well above the ducked music bed
+    if (loud) this.ctx.audio.bell(this.ctx.audio.now(), ORB_FREQS[i], 0.22, "sfx");
     else this.ctx.audio.sfx("pluck");
   }
 

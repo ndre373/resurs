@@ -47,11 +47,15 @@ export function RhythmGame(props: { onDone: (r: GameResult) => void }) {
   };
   useEffect(() => () => clearTimers(), []);
 
-  // hypnotic prompter: start cue
+  // hypnotic prompter: start cue; music way down — the drum pattern must lead
   useEffect(() => {
+    controller.audio.setGameFocus(true);
     voice.setContext("rhythm");
     voice.cue("Слушайте ритм… и повторяйте двумя руками…", controller.audio.muted);
-    return () => voice.setContext(null);
+    return () => {
+      controller.audio.setGameFocus(false);
+      voice.setContext(null);
+    };
   }, []);
 
   const finish = useCallback(() => {
