@@ -1,0 +1,17 @@
+import { chromium } from "playwright-core";
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium", args: ["--no-sandbox","--disable-gpu-sandbox","--use-gl=swiftshader"] });
+const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "allow" });
+const page = await ctx.newPage();
+const errors = [];
+page.on("console", m => { if (m.type() === "error") errors.push(m.text().slice(0, 300)); });
+page.on("pageerror", e => errors.push("PAGEERROR: " + String(e).slice(0, 300)));
+page.on("requestfailed", r => errors.push("REQFAIL: " + r.url().slice(0, 120) + " " + (r.failure()?.errorText || "")));
+await page.goto("https://zxd5enk5bafwc.kimi.page/", { waitUntil: "networkidle", timeout: 45000 }).catch(e => errors.push("GOTO: " + e.message));
+await page.waitForTimeout(6000);
+const rootHtml = await page.evaluate(() => document.getElementById("root")?.innerHTML.length || 0);
+const title = await page.evaluate(() => document.querySelector(".topbar-title, .title-hero, h1, h2")?.textContent || null);
+console.log("ROOT_HTML_LEN:", rootHtml);
+console.log("VISIBLE_TITLE:", title);
+console.log("ERRORS:", JSON.stringify(errors, null, 1));
+await page.screenshot({ path: "/tmp/live-site.png" });
+await browser.close();

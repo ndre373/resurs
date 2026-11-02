@@ -1,0 +1,165 @@
+/**
+ * BreathGame — HUD wrapper over the 3D lotus: phase label, cycle progress,
+ * breathing-pattern selector (coherent 5·5 / 4-7-8 / box 4·4·4·4), duration
+ * selector and the fading hypnotic prompter: precise phase cues for the first
+ * few cycles, then only rare soft reminders while the rhythm carries itself.
+ */
+
+import { useEffect, useRef, useState } from "react";
+import { controller } from "@/game/boot";
+import { voice } from "@/game/voice";
+import type { GameResult } from "@/game/types";
+import {
+  BREATH_PATTERNS,
+  patternById,
+  type BreathPattern,
+  type BreathPhase,
+} from "@/game/breathPatterns";
+import type { BreathState } from "@/game/scenes/breath";
+import { DurationChips, HowTo } from "@/ui/common";
+import { getDefaultDuration } from "@/game/settings";
+
+const cycleSeconds = (p: BreathPattern): number => p.steps.reduce((s, x) => s + x.sec, 0);
+
+/** Minutes → breath cycles for the given pattern. 0 minutes = endless. */
+const cyclesFor = (minutes: number, p: BreathPattern): number =>
+  minutes <= 0 ? Infinity : Math.max(1, Math.round((minutes * 60) / cycleSeconds(p)));
+
+/** Exact phase cues while the prompter still leads. */
+const PHASE_CUE: Record<BreathPhase, string> = {
+  in: "Вдох…",
+  hold: "Задержка…",
+  out: "Выдох…",
+};
+/** Soft reminders after the prompter fades out. */
+const SOFT_CUES = [
+  "Дыхание продолжается… само…",
+  "Вы делаете всё правильно…",
+  "Тело помнит ритм…",
+  "Просто следуйте за лотосом…",
+];
+/** How many first cycles the prompter guides every phase. */
+const GUIDED_CYCLES = 3;
+
+function pluralCycles(n: number): string {
+  const m10 = n % 10;
+  const m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return "цикл";
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return "цикла";
+  return "циклов";
+}
+
+export function BreathGame(props: {
+  onDone: (r: GameResult) => void;
+  cycles?: number;
+}) {
+  const [state, setState] = useState<BreathState | null>(null);
+  // In session mode (props.cycles) the duration is fixed — no selector.
+  const sessionMode = props.cycles !== undefined;
+  const [minutes, setMinutes] = useState(getDefaultDuration);
+  const [patternId, setPatternId] = useState(BREATH_PATTERNS[0].id);
+  const stateRef = useRef<BreathState | null>(null);
+  stateRef.current = state;
+
+  const pattern = patternById(patternId);
+
+  useEffect(() => {
+    let lastPhase: string | null = null;
+    const p = patternById(patternId);
+    const offState = controller.events.on<BreathState>("breath:state", (s) => {
+      setState(s);
+      if (s.phase !== lastPhase) {
+        lastPhase = s.phase;
+        if (s.cycle < GUIDED_CYCLES) {
+          // lead every phase at the start…
+          voice.cue(PHASE_CUE[s.phase], controller.audio.muted);
+        } else if (s.phase === "in" && s.cycle % 3 === 0) {
+          // …then fade to a soft reminder every few cycles
+          voice.cue(SOFT_CUES[(Math.random() * SOFT_CUES.length) | 0], controller.audio.muted);
+        }
+      }
+    });
+    const offDone = controller.events.on<GameResult>("scene:done", props.onDone);
+    controller.enterScene("breath", {
+      cycles: sessionMode ? props.cycles : cyclesFor(minutes, p),
+      breathPattern: p,
+    });
+    voice.setContext("breath");
+    return () => {
+      offState();
+      offDone();
+      controller.exitScene();
+      voice.stop();
+      voice.setContext(null);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [minutes, patternId]);
+
+  const finishEndless = () => {
+    const done = stateRef.current?.cycle ?? 0;
+    props.onDone({
+      game: "breath",
+      score: done,
+      detail: `${done} ${pluralCycles(done)} · ${pattern.label}`,
+    });
+  };
+
+  const phaseText = !state
+    ? "Приготовьтесь…"
+    : state.phase === "in"
+      ? "Вдох"
+      : state.phase === "hold"
+        ? "Задержка"
+        : "Выдох";
+  const hint =
+    state?.phase === "in"
+      ? "медленно, через нос, животом"
+      : state?.phase === "hold"
+        ? "мягко удерживайте воздух"
+        : "длинный, мягкий, без усилия";
+  const endless = !sessionMode && minutes === 0;
+  const cyclesText = !state
+    ? ""
+    : Number.isFinite(state.totalCycles)
+      ? `цикл ${Math.min(state.cycle + 1, state.totalCycles)} из ${state.totalCycles}`
+      : `цикл ${state.cycle + 1}`;
+
+  return (
+    <div className="game-stage overlay-pass">
+      <HowTo>
+        <p>
+          Следуйте за лотосом: он раскрывается — <b>вдох</b>, закрывается — <b>выдох</b>, замирает —{" "}
+          <b>задержка</b>. Выберите ритм: когерентное дыхание (5·5) переключает нервную систему в
+          ресурсный режим, 4-7-8 глубоко расслабляет, «квадрат» собирает внимание. Суфлёр ведёт
+          первые циклы, потом затихает — дыхание продолжается само.
+        </p>
+      </HowTo>
+      <div className="breath-hud">
+        <div className={`breath-phase ${state?.phase ?? ""}`}>{phaseText}</div>
+        <div className="breath-hint">{hint}</div>
+        <div className="breath-cycles">{cyclesText}</div>
+      </div>
+      {!sessionMode && (
+        <div className="pattern-chips" role="group" aria-label="Ритм дыхания">
+          {BREATH_PATTERNS.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              className={`chip ${p.id === patternId ? "on" : ""}`}
+              onClick={() => setPatternId(p.id)}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      )}
+      {!sessionMode && (
+        <DurationChips
+          value={minutes}
+          onChange={setMinutes}
+          onFinish={endless ? finishEndless : undefined}
+        />
+      )}
+    </div>
+  );
+}
