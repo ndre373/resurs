@@ -1,8 +1,10 @@
 /* sw.js — offline shell for the «Ресурс» app.
  * Network-first for documents (fresh deploys win), cache-first for hashed
  * build assets and icons. No external requests are cached. */
-const CACHE = "resurs-v5";
-const SHELL = ["/", "/index.html", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png"];
+const CACHE = "resurs-v6";
+// scope-relative paths: the same worker works from the domain root (local
+// server) and from a subpath (GitHub Pages serves the app at /resurs/)
+const SHELL = ["./", "index.html", "manifest.webmanifest", "icon-192.png", "icon-512.png"];
 
 self.addEventListener("install", (e) => {
   // precache the shell, then wait — the page decides when to activate
@@ -37,10 +39,10 @@ self.addEventListener("fetch", (e) => {
       fetch(e.request)
         .then((res) => {
           const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put("/index.html", copy));
+          caches.open(CACHE).then((c) => c.put("index.html", copy));
           return res;
         })
-        .catch(() => caches.match("/index.html")),
+        .catch(() => caches.match("index.html")),
     );
     return;
   }
@@ -51,7 +53,7 @@ self.addEventListener("fetch", (e) => {
       (hit) =>
         hit ??
         fetch(e.request).then((res) => {
-          if (res.ok && (url.pathname.startsWith("/assets/") || url.pathname.endsWith(".png"))) {
+          if (res.ok && (url.pathname.includes("/assets/") || url.pathname.endsWith(".png"))) {
             const copy = res.clone();
             caches.open(CACHE).then((c) => c.put(e.request, copy));
           }

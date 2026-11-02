@@ -18,7 +18,9 @@ export function initPwa(): void {
   if (!import.meta.env.PROD || !("serviceWorker" in navigator)) return;
   window.addEventListener("load", () => {
     navigator.serviceWorker
-      .register("/sw.js")
+      // BASE_URL keeps the worker at the app root both locally ("/")
+      // and under the GitHub Pages subpath ("/resurs/")
+      .register(import.meta.env.BASE_URL + "sw.js")
       .then((reg) => {
         const announce = (w: ServiceWorker | null) => {
           if (!w) return;

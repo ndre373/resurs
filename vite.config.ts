@@ -7,6 +7,9 @@ import gameBuildOutput from "./scripts/build-output"
 
 // https://vite.dev/config/
 export default defineConfig({
+  // PAGES_BUILD=1 is set only by the GitHub Pages workflow — the app is
+  // served under the /resurs/ subpath there; local builds keep the root "/"
+  base: process.env.PAGES_BUILD ? "/resurs/" : "/",
   plugins: [
     devServer({ entry: "api/boot.ts", exclude: [/^\/(?!api\/).*$/] }),
     react(), gameBuildOutput()],
