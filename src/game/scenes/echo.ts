@@ -19,6 +19,7 @@ export interface EchoHudState {
 
 interface Orb {
   mesh: THREE.Mesh<THREE.SphereGeometry, THREE.MeshStandardMaterial>;
+  halo: THREE.Mesh;
   baseEmissive: number;
   flash: number; // seconds remaining of highlight
   index: number;
@@ -42,6 +43,8 @@ export class EchoScene implements GameScene {
   private best = 0;
   private strikes = 0;
   private disposed = false;
+  /** Camera aspect the orb arc was laid out for — relayout when it changes. */
+  private laidOutAspect = 0;
 
   enter(ctx: SceneContext): void {
     this.ctx = ctx;
@@ -58,10 +61,7 @@ export class EchoScene implements GameScene {
           metalness: 0.2,
         }),
       );
-      const angle = THREE.MathUtils.degToRad(-56 + i * 28);
-      mesh.position.set(Math.sin(angle) * 4.4, 1.7, -Math.cos(angle) * 1.6);
       this.group.add(mesh);
-      this.orbs.push({ mesh, baseEmissive: 0.35, flash: 0, index: i });
 
       // soft halo ring under each orb
       const halo = new THREE.Mesh(
@@ -73,15 +73,40 @@ export class EchoScene implements GameScene {
           side: THREE.DoubleSide,
         }),
       );
-      halo.position.copy(mesh.position);
-      halo.position.y -= 1.0;
       halo.rotation.x = -Math.PI / 2;
       this.group.add(halo);
+
+      this.orbs.push({ mesh, halo, baseEmissive: 0.35, flash: 0, index: i });
     }
     ctx.scene.add(this.group);
     ctx.camera.position.set(0, 2.1, 7.5);
     ctx.camera.lookAt(0, 1.5, 0);
+    this.layout();
     this.newLevel(ECHO.START_LEN);
+  }
+
+  /**
+   * Fit the orb arc into the VISIBLE width of the screen. The camera FOV is
+   * vertical, so on a portrait phone (aspect ≈ 0.47) the fixed 4.4-wide arc
+   * pushes the two edge orbs off-screen — the player heard their tones but
+   * never saw the flashes. The radius shrinks until the outermost orbs are
+   * comfortably inside the frame; on wide screens it stays at 4.4.
+   */
+  private layout(): void {
+    const cam = this.ctx.camera;
+    const dist = 8.4; // camera z=7.5 to the depth of the edge orbs
+    const halfW =
+      Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)) * cam.aspect * dist;
+    const maxAngle = THREE.MathUtils.degToRad(56);
+    const radius = Math.min(4.4, (halfW * 0.85) / Math.sin(maxAngle));
+    for (let i = 0; i < this.orbs.length; i++) {
+      const angle = THREE.MathUtils.degToRad(-56 + i * 28);
+      const x = Math.sin(angle) * radius;
+      const z = -Math.cos(angle) * 1.6;
+      this.orbs[i].mesh.position.set(x, 1.7, z);
+      this.orbs[i].halo.position.set(x, 0.7, z);
+    }
+    this.laidOutAspect = cam.aspect;
   }
 
   private newLevel(len: number): void {
@@ -158,6 +183,9 @@ export class EchoScene implements GameScene {
   update(dt: number): void {
     if (this.disposed) return;
 
+    // phone rotated / window resized → refit the arc into the new frame
+    if (this.ctx.camera.aspect !== this.laidOutAspect) this.layout();
+
     for (const orb of this.orbs) {
       const mat = orb.mesh.material;
       if (orb.flash > 0) {
@@ -220,6 +248,8 @@ export class EchoScene implements GameScene {
     for (const orb of this.orbs) {
       orb.mesh.geometry.dispose();
       orb.mesh.material.dispose();
+      orb.halo.geometry.dispose();
+      (orb.halo.material as THREE.Material).dispose();
     }
     this.orbs = [];
   }
