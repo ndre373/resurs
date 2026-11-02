@@ -189,11 +189,11 @@ export class AudioEngine {
       // bells at lively levels — this catches the summed peaks so the output
       // stays loud without clipping/distortion.
       const comp = this.ctx.createDynamicsCompressor();
-      comp.threshold.value = -14;
-      comp.knee.value = 20;
-      comp.ratio.value = 6;
-      comp.attack.value = 0.003;
-      comp.release.value = 0.25;
+      comp.threshold.value = -12;
+      comp.knee.value = 18;
+      comp.ratio.value = 4;
+      comp.attack.value = 0.008; // slower: loud game bells no longer "pump" the music bed
+      comp.release.value = 0.22;
       this.master.connect(comp);
       comp.connect(this.ctx.destination);
       this.musicBus = this.ctx.createGain();
@@ -389,9 +389,11 @@ export class AudioEngine {
       this.nextChordAt += 9;
     }
 
-    // bells: probability and register follow energy
+    // bells: probability and register follow energy.
+    // Silent while a sound-driven game has focus (Echo / Rhythm): random bed
+    // bells sound exactly like game cues and break the flash↔tone mapping.
     const p = 0.12 + this.energy * 0.4;
-    if (Math.random() < p) {
+    if (this.focusFactor >= 1 && Math.random() < p) {
       const note = PENTA[(Math.random() * PENTA.length) | 0];
       this.bell(ctx.currentTime + Math.random() * 0.4, note, 0.05 + this.energy * 0.05);
     }
@@ -418,8 +420,10 @@ export class AudioEngine {
   }
 
   /** Public bell — used by games (Echo orbs, Mirror strokes) and by the generative layer.
-   *  bus: gameplay cues belong on "sfx" (the loud channel); the generative bed stays on "music". */
-  bell(at: number, freq: number, volume = 0.09, bus: "music" | "sfx" = "music"): void {
+   *  bus: gameplay cues belong on "sfx" (the loud channel); the generative bed stays on "music".
+   *  decay: seconds until the tone fades out. Echo cues pass a short decay so each
+   *  tone ends before the next flash — a 1.8 s tail would bleed into the next orb. */
+  bell(at: number, freq: number, volume = 0.09, bus: "music" | "sfx" = "music", decay = 1.8): void {
     const ctx = this.ctx;
     const out = bus === "sfx" ? this.sfxBus : this.musicBus;
     if (!ctx || !out || this.muted) return;
@@ -432,7 +436,7 @@ export class AudioEngine {
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(0, at);
     gain.gain.linearRampToValueAtTime(volume, at + 0.015);
-    gain.gain.exponentialRampToValueAtTime(0.0005, at + 1.8);
+    gain.gain.exponentialRampToValueAtTime(0.0005, at + decay);
     const gain2 = ctx.createGain();
     gain2.gain.value = 0.25;
     osc.connect(gain);
@@ -440,8 +444,8 @@ export class AudioEngine {
     gain.connect(out);
     osc.start(at);
     osc2.start(at);
-    osc.stop(at + 2);
-    osc2.stop(at + 2);
+    osc.stop(at + decay + 0.2);
+    osc2.stop(at + decay + 0.2);
   }
 
   // ---------------------------------------------------------------- sfx

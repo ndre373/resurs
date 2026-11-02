@@ -121,8 +121,10 @@ export class EchoScene implements GameScene {
   private flashOrb(i: number, loud: boolean): void {
     const orb = this.orbs[i];
     orb.flash = 0.45;
-    // gameplay cue → the loud sfx channel, well above the ducked music bed
-    if (loud) this.ctx.audio.bell(this.ctx.audio.now(), ORB_FREQS[i], 0.22, "sfx");
+    // gameplay cue → the loud sfx channel, well above the ducked music bed.
+    // Short 0.55 s decay: flashes come every 620 ms, a longer tail would
+    // overlap the next orb and blur which sound belongs to which flash.
+    if (loud) this.ctx.audio.bell(this.ctx.audio.now(), ORB_FREQS[i], 0.17, "sfx", 0.55);
     else this.ctx.audio.sfx("pluck");
   }
 
