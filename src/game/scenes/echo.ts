@@ -25,6 +25,9 @@ interface Orb {
 }
 
 export class EchoScene implements GameScene {
+  /** maxLen — длина цепочки, на которой игра завершается победой (выбор времени). */
+  constructor(private readonly maxLen: number = ECHO.MAX_LEN) {}
+
   private ctx!: SceneContext;
   private group = new THREE.Group();
   private orbs: Orb[] = [];
@@ -83,7 +86,21 @@ export class EchoScene implements GameScene {
 
   private newLevel(len: number): void {
     this.sequence = [];
-    for (let i = 0; i < len; i++) this.sequence.push((Math.random() * this.orbs.length) | 0);
+    for (let i = 0; i < len; i++) {
+      // never the same orb twice in a row: two identical flashes 620 ms apart
+      // merge into one long glow (and the bells overlap) — such a chain is
+      // impossible to read, the player can't tell 1 tap from 2
+      let orb: number;
+      do {
+        orb = (Math.random() * this.orbs.length) | 0;
+      } while (i > 0 && orb === this.sequence[i - 1]);
+      this.sequence.push(orb);
+    }
+    this.replay();
+  }
+
+  /** Re-show the current sequence from the start (after a mistake — same chain again). */
+  private replay(): void {
     this.phase = "watch";
     this.showIndex = -1;
     this.showTimer = 0.6; // short pause before the sequence starts
@@ -171,7 +188,7 @@ export class EchoScene implements GameScene {
       if (this.phasePause <= 0) {
         if (this.phase === "success") {
           const next = this.sequence.length + 1;
-          if (next > ECHO.MAX_LEN) {
+          if (next > this.maxLen) {
             this.ctx.finish({
               game: "echo",
               score: this.best,
@@ -189,7 +206,7 @@ export class EchoScene implements GameScene {
             });
             return;
           }
-          this.newLevel(this.sequence.length); // same length again
+          this.replay(); // same chain once more — as the HUD promises
         }
       }
     }

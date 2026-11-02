@@ -9,13 +9,13 @@ import type { GameResult } from "@/game/types";
 import type { EchoHudState } from "@/game/scenes/echo";
 import { HowTo } from "@/ui/common";
 
-export function EchoGame(props: { onDone: (r: GameResult) => void }) {
+export function EchoGame(props: { onDone: (r: GameResult) => void; maxLen?: number }) {
   const [state, setState] = useState<EchoHudState | null>(null);
 
   useEffect(() => {
     const offState = controller.events.on<EchoHudState>("echo:state", setState);
     const offDone = controller.events.on<GameResult>("scene:done", props.onDone);
-    controller.enterScene("echo");
+    controller.enterScene("echo", { maxLen: props.maxLen });
     controller.audio.setGameFocus(true); // music way down — the orb tones must lead
     voice.setContext("echo");
     voice.cue("Смотрите… слушайте… и повторяйте…", controller.audio.muted);

@@ -38,6 +38,29 @@ function isGameId(id: string): id is GameId {
   return id in GAME_META;
 }
 
+/** Games with a selectable run length (shown on the ready gate). */
+type LenChoice = "short" | "mid" | "long";
+const GAME_LENGTHS: Partial<
+  Record<GameId, { label: string; options: { id: LenChoice; label: string; value: number }[] }>
+> = {
+  echo: {
+    label: "Длина цепочки",
+    options: [
+      { id: "short", label: "Короткая · до 8", value: 8 },
+      { id: "mid", label: "Средняя · до 12", value: 12 },
+      { id: "long", label: "Длинная · до 16", value: 16 },
+    ],
+  },
+  rhythm: {
+    label: "Длина ритма",
+    options: [
+      { id: "short", label: "Короткий · до 6", value: 6 },
+      { id: "mid", label: "Средний · до 10", value: 10 },
+      { id: "long", label: "Длинный · до 14", value: 14 },
+    ],
+  },
+};
+
 /** Parse the URL into the shell's screen + (optional) active game. */
 function parsePath(pathname: string): { screen: Screen; game: GameId | null; badGame: boolean } {
   const m = pathname.match(/^\/game\/([a-z]+)\/?$/);
@@ -75,6 +98,8 @@ export default function Home() {
   // games never start on their own: a "ready" gate with a big start button
   // comes first — the player reads the rules, then launches the round
   const [gameReady, setGameReady] = useState(false);
+  // run length picked on the ready gate (games listed in GAME_LENGTHS)
+  const [lenChoice, setLenChoice] = useState<LenChoice>("mid");
   const [stats, setStats] = useState(getStats());
   const [sessionsCount, setSessionsCount] = useState(getSessions().length);
   const [streak, setStreak] = useState(getStreak().current);
@@ -157,6 +182,10 @@ export default function Home() {
     schedulePush(); // cloud backup when a sync code is connected
   }, []);
 
+  /** Selected run length for games that offer the choice (Echo, Rhythm). */
+  const pickedLen = (id: GameId): number | undefined =>
+    GAME_LENGTHS[id]?.options.find((o) => o.id === lenChoice)?.value;
+
   const renderGame = (id: GameId) => {
     const done = handleDone;
     switch (id) {
@@ -165,13 +194,13 @@ export default function Home() {
       case "stroop":
         return <StroopGame onDone={done} />;
       case "rhythm":
-        return <RhythmGame onDone={done} />;
+        return <RhythmGame onDone={done} maxSteps={pickedLen(id)} />;
       case "mirror":
         return <MirrorGame onDone={done} />;
       case "breath":
         return <BreathGame onDone={done} />;
       case "echo":
-        return <EchoGame onDone={done} />;
+        return <EchoGame onDone={done} maxLen={pickedLen(id)} />;
       case "flow":
         return <FlowGame onDone={done} />;
       case "cross":
@@ -337,6 +366,25 @@ export default function Home() {
                       </span>
                     ))}
                   </div>
+                  {GAME_LENGTHS[game] && (
+                    <div className="ready-len">
+                      <div className="ready-len-label">{GAME_LENGTHS[game].label}</div>
+                      <div className="chips">
+                        {GAME_LENGTHS[game].options.map((o) => (
+                          <button
+                            key={o.id}
+                            className={`chip ${lenChoice === o.id ? "on" : ""}`}
+                            onClick={() => {
+                              controller.audio.sfx("ui");
+                              setLenChoice(o.id);
+                            }}
+                          >
+                            {o.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <button
                     className="btn primary big"
                     autoFocus

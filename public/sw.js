@@ -1,7 +1,7 @@
 /* sw.js — offline shell for the «Ресурс» app.
  * Network-first for documents (fresh deploys win), cache-first for hashed
  * build assets and icons. No external requests are cached. */
-const CACHE = "resurs-v9";
+const CACHE = "resurs-v10";
 // scope-relative paths: the same worker works from the domain root (local
 // server) and from a subpath (GitHub Pages serves the app at /resurs/)
 const SHELL = ["./", "index.html", "manifest.webmanifest", "icon-192.png", "icon-512.png"];

@@ -23,7 +23,7 @@ function makePattern(len: number): Hand[] {
   return p;
 }
 
-export function RhythmGame(props: { onDone: (r: GameResult) => void }) {
+export function RhythmGame(props: { onDone: (r: GameResult) => void; maxSteps?: number }) {
   const [phase, setPhase] = useState<Phase>("ready");
   const [pattern, setPattern] = useState<Hand[]>(() => makePattern(RHYTHM.START_STEPS));
   const [activeStep, setActiveStep] = useState(-1);
@@ -119,7 +119,7 @@ export function RhythmGame(props: { onDone: (r: GameResult) => void }) {
         if (s.inputPos >= s.pattern.length) {
           s.best = Math.max(s.best, s.pattern.length);
           setBest(s.best);
-          if (s.pattern.length >= RHYTHM.MAX_STEPS) {
+          if (s.pattern.length >= (props.maxSteps ?? RHYTHM.MAX_STEPS)) {
             finish();
             return;
           }
