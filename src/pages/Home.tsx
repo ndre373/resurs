@@ -9,7 +9,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
-import { Sparkles, Flame, Settings, Play } from "lucide-react";
+import { Sparkles, Flame, Settings, Play, BookOpen } from "lucide-react";
 import { startGame, stopGame, controller } from "@/game/boot";
 import type { GameId, GameResult } from "@/game/types";
 import { getStats, getSessions, resetStats, recordResult, getStreak } from "@/game/stats";
@@ -21,6 +21,7 @@ import { SessionFlow } from "@/ui/SessionFlow";
 import { ProgressView } from "@/ui/ProgressView";
 import { SettingsView } from "@/ui/SettingsView";
 import { Onboarding, onboardingNeeded } from "@/ui/Onboarding";
+import { GuideView } from "@/ui/GuideView";
 import { applyPwaUpdate } from "@/pwa";
 import { AlphabetGame } from "@/games/AlphabetGame";
 import { StroopGame } from "@/games/StroopGame";
@@ -31,7 +32,7 @@ import { EchoGame } from "@/games/EchoGame";
 import { FlowGame } from "@/games/FlowGame";
 import { CrossGame } from "@/games/CrossGame";
 
-type Screen = "title" | "hub" | "game" | "session" | "progress" | "settings";
+type Screen = "title" | "hub" | "game" | "session" | "progress" | "settings" | "guide";
 
 function isGameId(id: string): id is GameId {
   return id in GAME_META;
@@ -54,6 +55,8 @@ function parsePath(pathname: string): { screen: Screen; game: GameId | null; bad
       return { screen: "session", game: null, badGame: false };
     case "/progress":
       return { screen: "progress", game: null, badGame: false };
+    case "/guide":
+      return { screen: "guide", game: null, badGame: false };
     case "/settings":
       return { screen: "settings", game: null, badGame: false };
     default:
@@ -221,6 +224,15 @@ export default function Home() {
                 Выбрать игру
               </button>
             </div>
+            <button
+              className="link-btn title-guide"
+              onClick={() => {
+                controller.audio.sfx("ui");
+                navigate("/guide");
+              }}
+            >
+              <BookOpen size={15} /> Как пользоваться: правила практики
+            </button>
             <div className="title-foot">
               наушники усилят эффект · фоновая музыка и звуки синтезируются живьём
             </div>
@@ -249,6 +261,15 @@ export default function Home() {
                     {streak > 0
                       ? `серия ${streak} ${streak === 1 ? "день" : streak < 5 ? "дня" : "дней"} подряд · история и рекорды`
                       : "история, серии дней и рекорды"}
+                  </div>
+                </div>
+              </button>
+              <button className="session-card guide-entry" onClick={() => navigate("/guide")}>
+                <BookOpen size={22} />
+                <div>
+                  <div className="session-card-title">Как пользоваться</div>
+                  <div className="session-card-sub">
+                    правила практики, устройство сеанса, безопасность
                   </div>
                 </div>
               </button>
@@ -380,6 +401,13 @@ export default function Home() {
                 }}
               />
             </div>
+          </div>
+        )}
+
+        {screen === "guide" && (
+          <div className="game-screen">
+            <TopBar title="Как пользоваться" simple onBack={goBack("/")} />
+            <GuideView />
           </div>
         )}
 
