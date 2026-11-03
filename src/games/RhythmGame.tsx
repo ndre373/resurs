@@ -81,7 +81,8 @@ export function RhythmGame(props: {
 
   const finishRef = useRef(finish);
   finishRef.current = finish;
-  const timer = useGameTimer(props.durationSec, () => finishRef.current());
+  // the clock starts when the run really starts — not on the «Слушать ритм» screen
+  const timer = useGameTimer(props.durationSec, () => finishRef.current(), phase !== "ready");
 
   const playPattern = useCallback(
     (p: Hand[]) => {

@@ -100,7 +100,8 @@ export function CrossGame(props: {
 
   const finishRef = useRef(finish);
   finishRef.current = finish;
-  const timer = useGameTimer(props.durationSec, () => finishRef.current());
+  // the clock starts when the run really starts — not on the «Нажмите Начать» screen
+  const timer = useGameTimer(props.durationSec, () => finishRef.current(), phase !== "ready");
 
   const nextCue = useCallback(
     (roundNo: number) => {

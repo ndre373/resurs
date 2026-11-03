@@ -324,12 +324,19 @@ export interface GameTimer {
  * Shared run timer for the ready-gate duration choice.
  * durationSec: finite = auto-finish at zero; Infinity = endless; undefined =
  * legacy round-based mode (timer inactive). Pauses with the app.
+ * active=false freezes the countdown — games with their own «Начать» screen
+ * (Cross, Rhythm) pass active only after the run really starts.
  */
-export function useGameTimer(durationSec: number | undefined, onTimeout: () => void): GameTimer {
+export function useGameTimer(
+  durationSec: number | undefined,
+  onTimeout: () => void,
+  running = true,
+): GameTimer {
   const [elapsed, setElapsed] = useState(0);
   const timeoutRef = useRef(onTimeout);
   timeoutRef.current = onTimeout;
-  const active = durationSec !== undefined;
+  const runningRef = useRef(running);
+  runningRef.current = running;
 
   useEffect(() => {
     if (durationSec === undefined) return;
@@ -339,7 +346,7 @@ export function useGameTimer(durationSec: number | undefined, onTimeout: () => v
     setElapsed(0);
     const iv = setInterval(() => {
       const now = performance.now();
-      if (!pauseBus.paused) acc += (now - last) / 1000;
+      if (!pauseBus.paused && runningRef.current) acc += (now - last) / 1000;
       last = now;
       setElapsed(acc);
       if (Number.isFinite(durationSec) && acc >= durationSec && !fired) {
@@ -357,5 +364,5 @@ export function useGameTimer(durationSec: number | undefined, onTimeout: () => v
       : endless
         ? fmtTime(elapsed)
         : fmtTime(Math.max(0, (durationSec as number) - elapsed));
-  return { text, endless, elapsed, active };
+  return { text, endless, elapsed, active: durationSec !== undefined };
 }
