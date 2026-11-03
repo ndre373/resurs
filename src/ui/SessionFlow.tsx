@@ -6,7 +6,7 @@
 
 import { useState } from "react";
 import { Sparkles, ArrowRight } from "lucide-react";
-import type { GameId, GameResult } from "@/game/types";
+import type { Difficulty, GameId, GameResult } from "@/game/types";
 import { recordResult, recordSession } from "@/game/stats";
 import { GAME_META } from "@/games/meta";
 import { BreathGame } from "@/games/BreathGame";
@@ -27,6 +27,13 @@ const LENGTHS = [
   { id: "long", label: "Длинный · ~10 мин", breathCycles: 10, mirrorSec: 90 },
 ] as const;
 
+/** Difficulty tiers — same choices as on the game ready gate. */
+const DIFFICULTIES: { id: Difficulty; label: string }[] = [
+  { id: "easy", label: "Лёгкая" },
+  { id: "mid", label: "Средняя" },
+  { id: "hard", label: "Сложная" },
+];
+
 type Step = "intention" | "breath" | "active" | "mirror" | "done";
 
 export function SessionFlow(props: { onExit: () => void }) {
@@ -37,6 +44,7 @@ export function SessionFlow(props: { onExit: () => void }) {
   const [gameChoice, setGameChoice] = useState<GameId | null>(null);
   const [activeGame, setActiveGame] = useState<GameId>("alphabet");
   const [lengthId, setLengthId] = useState<(typeof LENGTHS)[number]["id"]>("short");
+  const [difficulty, setDifficulty] = useState<Difficulty>("mid");
 
   const length = LENGTHS.find((l) => l.id === lengthId) ?? LENGTHS[0];
   const steps: Step[] = ["breath", "active", "mirror", "done"];
@@ -133,6 +141,20 @@ export function SessionFlow(props: { onExit: () => void }) {
               ))}
             </div>
           </div>
+          <div className="session-pick">
+            <div className="session-pick-label">Сложность</div>
+            <div className="chips">
+              {DIFFICULTIES.map((d) => (
+                <button
+                  key={d.id}
+                  className={`chip ${difficulty === d.id ? "on" : ""}`}
+                  onClick={() => setDifficulty(d.id)}
+                >
+                  {d.label}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="modal-actions">
             <button className="btn primary big" onClick={start}>
               Начать <ArrowRight size={16} />
@@ -147,7 +169,11 @@ export function SessionFlow(props: { onExit: () => void }) {
       {step === "breath" && (
         <div className="session-game">
           <div className="session-step-label">Шаг 2 · Настройка — дыхание</div>
-          <BreathGame cycles={length.breathCycles} onDone={(r) => collect(r, "active")} />
+          <BreathGame
+            cycles={length.breathCycles}
+            difficulty={difficulty}
+            onDone={(r) => collect(r, "active")}
+          />
         </div>
       )}
 
@@ -156,19 +182,35 @@ export function SessionFlow(props: { onExit: () => void }) {
           <div className="session-step-label">
             Шаг 3 · Игра — {GAME_META[activeGame].title}
           </div>
-          {activeGame === "alphabet" && <AlphabetGame onDone={(r) => collect(r, "mirror")} />}
-          {activeGame === "stroop" && <StroopGame onDone={(r) => collect(r, "mirror")} />}
-          {activeGame === "echo" && <EchoGame onDone={(r) => collect(r, "mirror")} />}
-          {activeGame === "rhythm" && <RhythmGame onDone={(r) => collect(r, "mirror")} />}
-          {activeGame === "flow" && <FlowGame onDone={(r) => collect(r, "mirror")} />}
-          {activeGame === "cross" && <CrossGame onDone={(r) => collect(r, "mirror")} />}
+          {activeGame === "alphabet" && (
+            <AlphabetGame difficulty={difficulty} onDone={(r) => collect(r, "mirror")} />
+          )}
+          {activeGame === "stroop" && (
+            <StroopGame difficulty={difficulty} onDone={(r) => collect(r, "mirror")} />
+          )}
+          {activeGame === "echo" && (
+            <EchoGame difficulty={difficulty} onDone={(r) => collect(r, "mirror")} />
+          )}
+          {activeGame === "rhythm" && (
+            <RhythmGame difficulty={difficulty} onDone={(r) => collect(r, "mirror")} />
+          )}
+          {activeGame === "flow" && (
+            <FlowGame difficulty={difficulty} onDone={(r) => collect(r, "mirror")} />
+          )}
+          {activeGame === "cross" && (
+            <CrossGame difficulty={difficulty} onDone={(r) => collect(r, "mirror")} />
+          )}
         </div>
       )}
 
       {step === "mirror" && (
         <div className="session-game">
           <div className="session-step-label">Шаг 4 · Интеграция — зеркало</div>
-          <MirrorGame autoFinishSec={length.mirrorSec} onDone={(r) => collect(r, "done")} />
+          <MirrorGame
+            autoFinishSec={length.mirrorSec}
+            difficulty={difficulty}
+            onDone={(r) => collect(r, "done")}
+          />
         </div>
       )}
 
