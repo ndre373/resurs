@@ -95,6 +95,7 @@ export function CrossGame(props: {
       detail: timed
         ? `${s.score} диагоналей · ошибок ${s.strikes}`
         : `${s.score} из ${totalRounds} диагоналей · ошибок ${s.strikes}`,
+      difficulty: props.difficulty ?? "mid",
     });
   }, [props, timed, totalRounds]);
 

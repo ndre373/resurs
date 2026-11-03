@@ -225,3 +225,28 @@ describe("resetStats", () => {
     expect(stats.exportPayload().resetAt).toBeGreaterThan(0);
   });
 });
+
+describe("bestByDiff", () => {
+  it("keeps a best per difficulty and never lowers it", () => {
+    stats.recordResult({ game: "echo", score: 5, detail: "", difficulty: "easy" });
+    stats.recordResult({ game: "echo", score: 3, detail: "", difficulty: "easy" });
+    stats.recordResult({ game: "echo", score: 7, detail: "", difficulty: "hard" });
+    const s = stats.getStats().echo;
+    expect(s?.bestByDiff).toEqual({ easy: 5, hard: 7 });
+    expect(s?.best).toBe(7);
+  });
+
+  it("merges per-difficulty records by max, not sum", () => {
+    stats.recordResult({ game: "echo", score: 5, detail: "", difficulty: "easy" });
+    stats.mergePayload({
+      stats: {
+        echo: { best: 8, plays: 3, lastDetail: "", bestByDiff: { easy: 3, mid: 8 } },
+      },
+      sessions: [],
+      activity: [],
+      updatedAt: Date.now(),
+    });
+    const s = stats.getStats().echo;
+    expect(s?.bestByDiff).toEqual({ easy: 5, mid: 8 });
+  });
+});

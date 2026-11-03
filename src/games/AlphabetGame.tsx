@@ -15,6 +15,8 @@ import { HowTo, useGameTimer } from "@/ui/common";
 
 type Cue = "Л" | "П" | "О";
 const LETTERS = "АБВГДЕЖЗИКЛМНОПРСТУФХЦЧШЭЮЯ".split("");
+/** Classic mode uses the full alphabet, in order — as in Grinder's drill. */
+const ALPHABET_FULL = "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ".split("");
 const CUES: Cue[] = ["Л", "П", "О"];
 
 interface Trial {
@@ -39,13 +41,20 @@ export function AlphabetGame(props: {
   /** Ready-gate time choice: finite seconds = timed run, Infinity = endless. */
   durationSec?: number;
   difficulty?: Difficulty;
+  /** Classic Grinder drill: letters march A→Я in order (say them aloud!). */
+  classic?: boolean;
 }) {
   /** Run length in rounds — legacy/session mode (no durationSec given). */
   const totalRounds = props.rounds ?? ALPHABET.ROUNDS;
   /** Timer mode is on when the gate passed a duration. */
   const timed = props.durationSec !== undefined;
   const diff = ALPHABET_DIFF[props.difficulty ?? "mid"];
-  const [trial, setTrial] = useState<Trial>(() => randomTrial());
+  const classic = props.classic ?? false;
+  const [trial, setTrial] = useState<Trial>(() =>
+    classic
+      ? { letter: ALPHABET_FULL[0], cue: CUES[(Math.random() * CUES.length) | 0] }
+      : randomTrial(),
+  );
   const [round, setRound] = useState(1);
   const [streak, setStreak] = useState(0);
   const [correct, setCorrect] = useState(0);
@@ -89,12 +98,13 @@ export function AlphabetGame(props: {
     props.onDone({
       game: "alphabet",
       score: s.correct,
-      detail: timed
+      detail: (classic ? "по алфавиту · " : "") + (timed
         ? `${s.correct} верно · реакция ${avg} мс`
-        : `${s.correct}/${totalRounds} верно · реакция ${avg} мс`,
+        : `${s.correct}/${totalRounds} верно · реакция ${avg} мс`),
       reactionMs: avg > 0 ? avg : undefined,
+      difficulty: props.difficulty ?? "mid",
     });
-  }, [props, timed, totalRounds]);
+  }, [props, timed, totalRounds, classic]);
 
   const finishRef = useRef(finish);
   finishRef.current = finish;
@@ -110,10 +120,18 @@ export function AlphabetGame(props: {
     const w = Math.max(diff.minWindow, diff.baseWindow - s.streak * diff.shrink);
     setWindowMs(w);
     setRound(s.round);
-    setTrial((prev) => randomTrial(prev));
+    // classic: letters march А→Я in order (looping); random mode as before
+    setTrial((prev) =>
+      classic
+        ? {
+            letter: ALPHABET_FULL[(s.round - 1) % ALPHABET_FULL.length],
+            cue: CUES[(Math.random() * CUES.length) | 0],
+          }
+        : randomTrial(prev),
+    );
     shownAt.current = performance.now();
     scheduleDeadline(w);
-  }, [finish, timed, totalRounds, diff]);
+  }, [finish, timed, totalRounds, diff, classic]);
 
   const scheduleDeadline = useCallback(
     (w: number) => {
@@ -219,6 +237,13 @@ export function AlphabetGame(props: {
           На экране — буква и знак: <b>Л</b> — ответьте левой рукой, <b>П</b> — правой, <b>О</b> —
           обеими сразу. Клавиши: ← / ↓ / → (или F / Пробел / J). Темп растёт с серией верных
           ответов: сознание не успевает контролировать — включается состояние.
+          {classic && (
+            <>
+              {" "}
+              <b>Классический режим:</b> буквы идут по алфавиту — проговаривайте каждую вслух,
+              как в оригинальной игре Гриндера.
+            </>
+          )}
         </p>
       </HowTo>
 

@@ -93,7 +93,9 @@ export function BreathGame(props: {
         }
       }
     });
-    const offDone = controller.events.on<GameResult>("scene:done", props.onDone);
+    const offDone = controller.events.on<GameResult>("scene:done", (r) =>
+      props.onDone({ ...r, difficulty: props.difficulty ?? "mid" }),
+    );
     controller.enterScene("breath", {
       cycles: sessionMode ? props.cycles : cyclesFor(minutes, p),
       breathPattern: p,
@@ -115,6 +117,7 @@ export function BreathGame(props: {
       game: "breath",
       score: done,
       detail: `${done} ${pluralCycles(done)} · ${pattern.label}`,
+      difficulty: props.difficulty ?? "mid",
     });
   };
 

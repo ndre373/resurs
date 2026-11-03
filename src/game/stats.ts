@@ -82,10 +82,18 @@ export function getStats(): StatsMap {
 export function recordResult(result: GameResult): StatsMap {
   const stats = getStats();
   const prev = stats[result.game];
+  const bestByDiff = { ...(prev?.bestByDiff ?? {}) };
+  if (result.difficulty) {
+    bestByDiff[result.difficulty] = Math.max(
+      bestByDiff[result.difficulty] ?? 0,
+      result.score,
+    );
+  }
   stats[result.game] = {
     best: Math.max(prev?.best ?? 0, result.score),
     plays: (prev?.plays ?? 0) + 1,
     lastDetail: result.detail,
+    ...(result.difficulty ? { bestByDiff } : prev?.bestByDiff ? { bestByDiff } : {}),
   };
   storage.set("stats", stats);
   const history = getHistory();
@@ -182,12 +190,22 @@ export function mergePayload(remote: StatsPayload): void {
     const gid = id as GameId;
     const l = merged[gid];
     if (!r) continue;
+    // per-difficulty records merge by max — never summed, never lost
+    const bestByDiff: NonNullable<typeof r.bestByDiff> = { ...(l?.bestByDiff ?? {}) };
+    for (const [d, v] of Object.entries(r.bestByDiff ?? {})) {
+      const key = d as keyof typeof bestByDiff;
+      if (v !== undefined) bestByDiff[key] = Math.max(bestByDiff[key] ?? 0, v);
+    }
+    const hasDiffs = Object.keys(bestByDiff).length > 0;
     if (!l || r.best > l.best || r.plays > l.plays) {
       merged[gid] = {
         best: Math.max(l?.best ?? 0, r.best ?? 0),
         plays: Math.max(l?.plays ?? 0, r.plays ?? 0),
         lastDetail: newerRemote || !l ? r.lastDetail : l.lastDetail,
+        ...(hasDiffs ? { bestByDiff } : {}),
       };
+    } else if (hasDiffs) {
+      merged[gid] = { ...l, bestByDiff };
     }
   }
   storage.set("stats", merged);

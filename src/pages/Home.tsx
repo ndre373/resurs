@@ -86,6 +86,8 @@ export default function Home() {
   // ready-gate choices: run length in minutes (0 = endless) + difficulty tier
   const [minutes, setMinutes] = useState(getDefaultDuration);
   const [difficulty, setDifficulty] = useState<Difficulty>("mid");
+  // alphabet-only: random letters or the classic А→Я Grinder drill
+  const [classicMode, setClassicMode] = useState(false);
   const [stats, setStats] = useState(getStats());
   const [sessionsCount, setSessionsCount] = useState(getSessions().length);
   const [streak, setStreak] = useState(getStreak().current);
@@ -162,7 +164,7 @@ export default function Home() {
     const done = handleDone;
     switch (id) {
       case "alphabet":
-        return <AlphabetGame onDone={done} durationSec={durationSec} difficulty={difficulty} />;
+        return <AlphabetGame onDone={done} durationSec={durationSec} difficulty={difficulty} classic={classicMode} />;
       case "stroop":
         return <StroopGame onDone={done} durationSec={durationSec} difficulty={difficulty} />;
       case "rhythm":
@@ -390,6 +392,36 @@ export default function Home() {
                     </div>
                     <div className="ready-hint">{GAME_META[game].diffHint[difficulty]}</div>
                   </div>
+                  {game === "alphabet" && (
+                    <div className="ready-len">
+                      <div className="ready-len-label">Режим</div>
+                      <div className="chips">
+                        <button
+                          className={`chip ${!classicMode ? "on" : ""}`}
+                          onClick={() => {
+                            controller.audio.sfx("ui");
+                            setClassicMode(false);
+                          }}
+                        >
+                          Случайные буквы
+                        </button>
+                        <button
+                          className={`chip ${classicMode ? "on" : ""}`}
+                          onClick={() => {
+                            controller.audio.sfx("ui");
+                            setClassicMode(true);
+                          }}
+                        >
+                          По алфавиту
+                        </button>
+                      </div>
+                      <div className="ready-hint">
+                        {classicMode
+                          ? "буквы от А до Я по порядку — проговаривайте каждую вслух"
+                          : "как в тренажёре скорости — буквы выпадают случайно"}
+                      </div>
+                    </div>
+                  )}
                   <button
                     className="btn primary big"
                     autoFocus

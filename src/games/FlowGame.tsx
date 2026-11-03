@@ -31,11 +31,14 @@ export function FlowGame(props: {
   const endless = durationSec === Infinity;
 
   useEffect(() => {
+    const diff = props.difficulty ?? "mid";
     const offState = controller.events.on<FlowHudState>("flow:state", setState);
-    const offDone = controller.events.on<GameResult>("scene:done", props.onDone);
+    const offDone = controller.events.on<GameResult>("scene:done", (r) =>
+      props.onDone({ ...r, difficulty: diff }),
+    );
     controller.enterScene("flow", {
       durationSec,
-      speedScale: FLOW_DIFF[props.difficulty ?? "mid"],
+      speedScale: FLOW_DIFF[diff],
     });
     voice.setContext("flow");
     voice.cue("Ведите искру… сквозь кольца… не спеша…", controller.audio.muted);
@@ -56,6 +59,7 @@ export function FlowGame(props: {
       game: "flow",
       score: hits,
       detail: `${hits} колец · лучшая серия ${s?.bestCombo ?? 0}`,
+      difficulty: props.difficulty ?? "mid",
     });
   };
 

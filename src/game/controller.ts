@@ -199,6 +199,7 @@ class Controller {
       maxLen?: number;
       showMs?: number;
       speedScale?: number;
+      orbCount?: number;
     },
   ): Promise<GameScene> {
     if (name === "breath") {
@@ -211,6 +212,7 @@ class Controller {
         maxLen: opts?.maxLen,
         durationSec: opts?.durationSec,
         showMs: opts?.showMs,
+        orbCount: opts?.orbCount,
       });
     }
     const m = await import("./scenes/flow");
@@ -226,6 +228,7 @@ class Controller {
       maxLen?: number;
       showMs?: number;
       speedScale?: number;
+      orbCount?: number;
     },
   ): void {
     this.exitScene();

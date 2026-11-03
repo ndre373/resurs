@@ -110,6 +110,7 @@ export function StroopGame(props: {
         ? `${s.correct} верно · реакция ${avg} мс`
         : `${s.correct}/${totalRounds} верно · реакция ${avg} мс`,
       reactionMs: avg > 0 ? avg : undefined,
+      difficulty: props.difficulty ?? "mid",
     });
   }, [props, timed, totalRounds]);
 

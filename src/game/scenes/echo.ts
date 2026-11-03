@@ -8,7 +8,7 @@ import * as THREE from "three";
 import { COLORS, ECHO } from "../config";
 import type { GameScene, SceneContext } from "../scene";
 
-const ORB_FREQS = [523.25, 587.33, 659.25, 783.99, 880]; // C5 D5 E5 G5 A5
+const ORB_FREQS = [523.25, 587.33, 659.25, 783.99, 880, 1046.5]; // C5 D5 E5 G5 A5 C6
 
 export interface EchoHudState {
   phase: "watch" | "repeat" | "success" | "fail";
@@ -29,13 +29,15 @@ export class EchoScene implements GameScene {
   /**
    * maxLen — цепочка победы в классическом режиме (без таймера);
    * durationSec — режим на время: цепочка растёт, пока не выйдет время
-   * (Infinity = бесконечно, финиш кнопкой в HUD); showMs — темп вспышек.
+   * (Infinity = бесконечно, финиш кнопкой в HUD); showMs — темп вспышек;
+   * orbCount — сколько сфер в дуге (5 обычно, 6 на сложном уровне).
    */
   constructor(
     private readonly opts: {
       maxLen?: number;
       durationSec?: number;
       showMs?: number;
+      orbCount?: number;
     } = {},
   ) {}
 
@@ -62,13 +64,16 @@ export class EchoScene implements GameScene {
   private get showMs(): number {
     return this.opts.showMs ?? ECHO.SHOW_MS;
   }
+  private get orbCount(): number {
+    return Math.min(this.opts.orbCount ?? 5, ORB_FREQS.length);
+  }
   /** Camera aspect the orb arc was laid out for — relayout when it changes. */
   private laidOutAspect = 0;
 
   enter(ctx: SceneContext): void {
     this.ctx = ctx;
     const geo = new THREE.SphereGeometry(0.62, 32, 24);
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < this.orbCount; i++) {
       const color = COLORS.palette[i % COLORS.palette.length];
       const mesh = new THREE.Mesh(
         geo,
@@ -118,8 +123,11 @@ export class EchoScene implements GameScene {
       Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)) * cam.aspect * dist;
     const maxAngle = THREE.MathUtils.degToRad(56);
     const radius = Math.min(4.4, (halfW * 0.85) / Math.sin(maxAngle));
+    // the arc always spans −56°…+56°; the step depends on the orb count
+    // (5 orbs → 28° apart, 6 orbs → 22.4° apart)
+    const step = 112 / Math.max(1, this.orbs.length - 1);
     for (let i = 0; i < this.orbs.length; i++) {
-      const angle = THREE.MathUtils.degToRad(-56 + i * 28);
+      const angle = THREE.MathUtils.degToRad(-56 + i * step);
       const x = Math.sin(angle) * radius;
       const z = -Math.cos(angle) * 1.6;
       this.orbs[i].mesh.position.set(x, 1.7, z);

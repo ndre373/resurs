@@ -64,6 +64,7 @@ export function MirrorGame(props: {
       game: "mirror",
       score: d.strokes,
       detail: `${pluralStrokes(d.strokes)} · ${seconds} с рисования`,
+      difficulty: props.difficulty ?? "mid",
     });
   }, [props]);
 

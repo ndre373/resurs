@@ -91,11 +91,22 @@ export function ProgressView(props: { onChanged?: () => void }) {
         {GAME_ORDER.map((id) => {
           const s = stats[id];
           const m = GAME_META[id];
+          const diffs = s?.bestByDiff;
           return (
             <div key={id} className="progress-row">
               <span className="progress-game">{m.title}</span>
               <span className="dim">
-                {s ? `${s.plays} ${plural(s.plays, "раз", "раза", "раз")} · лучший: ${s.best}` : "ещё не играли"}
+                {s
+                  ? `${s.plays} ${plural(s.plays, "раз", "раза", "раз")} · лучший: ${s.best}`
+                  : "ещё не играли"}
+                {diffs && Object.keys(diffs).length > 1 && (
+                  <span className="diff-records">
+                    {(["easy", "mid", "hard"] as const)
+                      .filter((d) => diffs[d] !== undefined)
+                      .map((d) => `${d === "easy" ? "лёг" : d === "mid" ? "ср" : "слож"} ${diffs[d]}`)
+                      .join(" · ")}
+                  </span>
+                )}
               </span>
             </div>
           );

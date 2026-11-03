@@ -14,6 +14,9 @@ export type GameId =
 
 export type SceneName = "breath" | "echo" | "flow";
 
+/** Difficulty picked on the ready gate: easy / mid (default) / hard. */
+export type Difficulty = "easy" | "mid" | "hard";
+
 /** Result of a finished game round, shown on the result screen and saved to stats. */
 export interface GameResult {
   game: GameId;
@@ -23,6 +26,8 @@ export interface GameResult {
   detail: string;
   /** Average reaction time in ms — set by the speed games (alphabet/stroop). */
   reactionMs?: number;
+  /** Difficulty the run was played at — feeds the per-difficulty records. */
+  difficulty?: Difficulty;
 }
 
 /** One finished play — the raw material for the progress charts. */
@@ -38,12 +43,11 @@ export interface GameStats {
   best: number;
   plays: number;
   lastDetail: string;
+  /** Best score per difficulty tier — only for runs that reported one. */
+  bestByDiff?: Partial<Record<Difficulty, number>>;
 }
 
 export type StatsMap = Partial<Record<GameId, GameStats>>;
-
-/** Difficulty picked on the ready gate: easy / mid (default) / hard. */
-export type Difficulty = "easy" | "mid" | "hard";
 
 export interface SessionRecord {
   at: number; // timestamp

@@ -82,6 +82,7 @@ export function RhythmGame(props: {
       game: "rhythm",
       score: s.best,
       detail: `ритм длиной ${s.best} · ошибок ${s.strikes}`,
+      difficulty: props.difficulty ?? "mid",
     });
   }, [props]);
 

@@ -25,11 +25,16 @@ export function EchoGame(props: {
 
   useEffect(() => {
     const offState = controller.events.on<EchoHudState>("echo:state", setState);
-    const offDone = controller.events.on<GameResult>("scene:done", props.onDone);
+    // the scene reports the bare result; the wrapper stamps the difficulty on it
+    const diff = props.difficulty ?? "mid";
+    const offDone = controller.events.on<GameResult>("scene:done", (r) =>
+      props.onDone({ ...r, difficulty: diff }),
+    );
     controller.enterScene("echo", {
       maxLen: props.maxLen,
       durationSec: props.durationSec,
-      showMs: ECHO_DIFF[props.difficulty ?? "mid"],
+      showMs: ECHO_DIFF[diff],
+      orbCount: diff === "hard" ? 6 : 5, // hard tier: a sixth orb joins the arc
     });
     controller.audio.setGameFocus(true); // music way down — the orb tones must lead
     voice.setContext("echo");
@@ -60,6 +65,7 @@ export function EchoGame(props: {
       game: "echo",
       score: state?.best ?? 0,
       detail: `цепочка до ${state?.best ?? 0} звуков`,
+      difficulty: props.difficulty ?? "mid",
     });
 
   return (

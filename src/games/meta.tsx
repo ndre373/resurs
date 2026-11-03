@@ -62,7 +62,7 @@ export const GAME_META: Record<GameId, GameMeta> = {
     diffHint: {
       easy: "медленные вспышки — каждые 0,85 с",
       mid: "вспышки каждые 0,62 с",
-      hard: "быстрые вспышки — каждые 0,46 с",
+      hard: "быстрые вспышки — 0,46 с, и сфер шесть",
     },
     isDom: false,
   },
