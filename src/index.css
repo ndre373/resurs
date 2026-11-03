@@ -843,6 +843,9 @@ input, textarea { user-select: text; }
 }
 
 .chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+/* 1–10 state scale: compact square chips that fit one row on a phone */
+.state-scale { gap: 6px; }
+.state-scale .chip { padding: 8px 0; min-width: 34px; text-align: center; }
 .chip {
   padding: 8px 16px;
   border-radius: 999px;

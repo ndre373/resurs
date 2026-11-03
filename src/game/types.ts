@@ -50,4 +50,7 @@ export interface SessionRecord {
   intention: string;
   games: GameId[];
   results: GameResult[];
+  /** Self-rated state 1..10 before / after the session — the measurable effect. */
+  stateBefore?: number;
+  stateAfter?: number;
 }

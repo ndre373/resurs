@@ -41,6 +41,12 @@ export function ProgressView(props: { onChanged?: () => void }) {
   const streak = getStreak();
   const totalPlays = GAME_ORDER.reduce((n, id) => n + (stats[id]?.plays ?? 0), 0);
   const recent = sessions.slice(-5).reverse();
+  // measurable effect: state lift (after − before) across rated sessions
+  const lifts = sessions
+    .filter((s) => s.stateBefore != null && s.stateAfter != null)
+    .map((s) => s.stateAfter! - s.stateBefore!);
+  const avgLift =
+    lifts.length > 0 ? lifts.reduce((a, b) => a + b, 0) / lifts.length : null;
 
   return (
     <div className="progress">
@@ -62,6 +68,12 @@ export function ProgressView(props: { onChanged?: () => void }) {
             {plural(sessions.length, "сеанс", "сеанса", "сеансов")}
           </div>
           <div className="progress-sub">{totalPlays} {plural(totalPlays, "игра", "игры", "игр")}</div>
+          {avgLift !== null && (
+            <div className="progress-sub">
+              средний прирост состояния: {avgLift > 0 ? "+" : ""}
+              {avgLift.toFixed(1).replace(".", ",")}
+            </div>
+          )}
         </div>
         <div className="progress-card">
           <CalendarDays size={22} className="progress-icon calm" />
@@ -99,7 +111,12 @@ export function ProgressView(props: { onChanged?: () => void }) {
             {recent.map((s, i) => (
               <div key={i} className="progress-row">
                 <span className="progress-game">«{s.intention}»</span>
-                <span className="dim">{formatDate(s.at)}</span>
+                <span className="dim">
+                  {s.stateBefore != null && s.stateAfter != null
+                    ? `${s.stateBefore} → ${s.stateAfter}${s.stateAfter > s.stateBefore ? ` (+${s.stateAfter - s.stateBefore})` : ""} · `
+                    : ""}
+                  {formatDate(s.at)}
+                </span>
               </div>
             ))}
           </div>

@@ -36,6 +36,25 @@ const DIFFICULTIES: { id: Difficulty; label: string; hint: string }[] = [
 
 type Step = "intention" | "breath" | "active" | "mirror" | "done";
 
+/** Self-rated state scale 1..10 — measured before and after the session. */
+const STATE_SCALE = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+function StateScale(props: { value: number; onPick: (v: number) => void }) {
+  return (
+    <div className="chips state-scale">
+      {STATE_SCALE.map((v) => (
+        <button
+          key={v}
+          className={`chip ${props.value === v ? "on" : ""}`}
+          onClick={() => props.onPick(v)}
+        >
+          {v}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function SessionFlow(props: { onExit: () => void }) {
   const [step, setStep] = useState<Step>("intention");
   const [intention, setIntention] = useState("");
@@ -45,6 +64,7 @@ export function SessionFlow(props: { onExit: () => void }) {
   const [activeGame, setActiveGame] = useState<GameId>("alphabet");
   const [lengthId, setLengthId] = useState<(typeof LENGTHS)[number]["id"]>("short");
   const [difficulty, setDifficulty] = useState<Difficulty>("mid");
+  const [stateBefore, setStateBefore] = useState(5);
 
   const length = LENGTHS.find((l) => l.id === lengthId) ?? LENGTHS[0];
   const steps: Step[] = ["breath", "active", "mirror", "done"];
@@ -61,12 +81,14 @@ export function SessionFlow(props: { onExit: () => void }) {
     setStep(next);
   };
 
-  const finish = () => {
+  const finish = (stateAfter: number) => {
     recordSession({
       at: Date.now(),
       intention: intention || "ресурсное состояние",
       games: results.map((r) => r.game),
       results,
+      stateBefore,
+      stateAfter,
     });
   };
 
@@ -158,6 +180,11 @@ export function SessionFlow(props: { onExit: () => void }) {
               {DIFFICULTIES.find((d) => d.id === difficulty)?.hint}
             </div>
           </div>
+          <div className="session-pick">
+            <div className="session-pick-label">Состояние сейчас</div>
+            <StateScale value={stateBefore} onPick={setStateBefore} />
+            <div className="ready-hint">1 — совсем тяжело · 10 — полный ресурс</div>
+          </div>
           <div className="modal-actions">
             <button className="btn primary big" onClick={start}>
               Начать <ArrowRight size={16} />
@@ -217,7 +244,17 @@ export function SessionFlow(props: { onExit: () => void }) {
         </div>
       )}
 
-      {step === "done" && <SessionDone intention={intention} results={results} onExit={() => { finish(); props.onExit(); }} />}
+      {step === "done" && (
+        <SessionDone
+          intention={intention}
+          results={results}
+          stateBefore={stateBefore}
+          onExit={(after) => {
+            finish(after);
+            props.onExit();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -225,8 +262,11 @@ export function SessionFlow(props: { onExit: () => void }) {
 function SessionDone(props: {
   intention: string;
   results: GameResult[];
-  onExit: () => void;
+  stateBefore: number;
+  onExit: (stateAfter: number) => void;
 }) {
+  const [after, setAfter] = useState(props.stateBefore);
+  const delta = after - props.stateBefore;
   return (
     <div className="session-intent">
       <Sparkles size={40} className="session-spark" />
@@ -235,6 +275,14 @@ function SessionDone(props: {
         Вернитесь мысленно к контексту «{props.intention || "ресурсное состояние"}». Не ищите ответ
         усилием — позвольте ему появиться. Обычно он приходит в ближайшие часы.
       </p>
+      <div className="session-pick">
+        <div className="session-pick-label">Как вы себя чувствуете теперь?</div>
+        <StateScale value={after} onPick={setAfter} />
+        <div className="ready-hint">
+          было {props.stateBefore} → стало {after}
+          {delta > 0 ? ` · прирост +${delta}` : delta < 0 ? ` · ${delta}` : " · без изменений"}
+        </div>
+      </div>
       <div className="session-results">
         {props.results.map((r, i) => (
           <div key={i} className="session-result-row">
@@ -244,7 +292,7 @@ function SessionDone(props: {
         ))}
       </div>
       <div className="modal-actions">
-        <button className="btn primary big" onClick={props.onExit}>
+        <button className="btn primary big" onClick={() => props.onExit(after)}>
           Вернуться к играм
         </button>
       </div>
