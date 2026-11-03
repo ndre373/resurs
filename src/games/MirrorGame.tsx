@@ -34,15 +34,16 @@ export function MirrorGame(props: {
   const [strokes, setStrokes] = useState(0);
 
   const draw = useRef({
-    active: false,
-    lastX: 0,
-    lastY: 0,
     hue: 190,
     strokes: 0,
     startedAt: performance.now(),
     lastBell: 0,
     done: false,
   });
+  // Every active finger paints its own line with its own colour offset —
+  // two-handed bilateral drawing, as in the classic practice
+  const pointers = useRef(new Map<number, { x: number; y: number; hueOff: number }>());
+  const nextHueOff = useRef(0);
   const fourWayRef = useRef(fourWay);
   fourWayRef.current = fourWay;
 
@@ -100,14 +101,12 @@ export function MirrorGame(props: {
     return () => window.removeEventListener("resize", resize);
   }, []);
 
-  const paintSegment = (x0: number, y0: number, x1: number, y1: number, w: number) => {
+  const paintSegment = (x0: number, y0: number, x1: number, y1: number, w: number, hue: number) => {
     const canvas = canvasRef.current!;
     const ctx = canvas.getContext("2d")!;
     const W = window.innerWidth;
     const H = window.innerHeight;
-    const d = draw.current;
-    d.hue = (d.hue + Math.hypot(x1 - x0, y1 - y0) * 0.12) % 360;
-    const color = `hsl(${d.hue}, 85%, 68%)`;
+    const color = `hsl(${hue}, 85%, 68%)`;
     ctx.strokeStyle = color;
     ctx.lineWidth = w;
     ctx.shadowColor = color;
@@ -130,9 +129,13 @@ export function MirrorGame(props: {
   const onPointerDown = (e: React.PointerEvent) => {
     const d = draw.current;
     if (d.done) return;
-    d.active = true;
-    d.lastX = e.clientX;
-    d.lastY = e.clientY;
+    // each new finger gets the next colour offset (0°, 140°, 260°, …)
+    pointers.current.set(e.pointerId, {
+      x: e.clientX,
+      y: e.clientY,
+      hueOff: nextHueOff.current,
+    });
+    nextHueOff.current = (nextHueOff.current + 140) % 360;
     d.strokes++;
     setStrokes(d.strokes);
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
@@ -141,23 +144,29 @@ export function MirrorGame(props: {
 
   const onPointerMove = (e: React.PointerEvent) => {
     const d = draw.current;
-    if (!d.active || d.done) return;
-    const dist = Math.hypot(e.clientX - d.lastX, e.clientY - d.lastY);
+    if (d.done) return;
+    const p = pointers.current.get(e.pointerId);
+    if (!p) return;
+    const dist = Math.hypot(e.clientX - p.x, e.clientY - p.y);
     if (dist < 2) return;
+    d.hue = (d.hue + dist * 0.12) % 360;
     const w = Math.max(2, 9 - dist * 0.08);
-    paintSegment(d.lastX, d.lastY, e.clientX, e.clientY, w);
-    d.lastX = e.clientX;
-    d.lastY = e.clientY;
-    const now = performance.now();
-    if (now - d.lastBell > 380 && dist > 12) {
-      d.lastBell = now;
-      const idx = Math.min(PENTA.length - 1, Math.floor((e.clientX / window.innerWidth) * PENTA.length));
-      controller.audio.bell(controller.audio.now(), PENTA[idx], 0.045);
+    paintSegment(p.x, p.y, e.clientX, e.clientY, w, (d.hue + p.hueOff) % 360);
+    p.x = e.clientX;
+    p.y = e.clientY;
+    // bells follow the primary hand only — two chiming hands turn to noise
+    if (e.isPrimary) {
+      const now = performance.now();
+      if (now - d.lastBell > 380 && dist > 12) {
+        d.lastBell = now;
+        const idx = Math.min(PENTA.length - 1, Math.floor((e.clientX / window.innerWidth) * PENTA.length));
+        controller.audio.bell(controller.audio.now(), PENTA[idx], 0.045);
+      }
     }
   };
 
-  const onPointerUp = () => {
-    draw.current.active = false;
+  const onPointerUp = (e: React.PointerEvent) => {
+    pointers.current.delete(e.pointerId);
   };
 
   const clear = () => {
@@ -180,8 +189,9 @@ export function MirrorGame(props: {
       <div className="mirror-top">
         <HowTo>
           <p>
-            Рисуйте свободно — каждый штрих зеркалится. Рука, цвет и звук движутся вместе:
-            кинестетика и зрение синхронизируют оба полушария. Здесь нет ошибок — есть только поток.
+            Рисуйте свободно — <b>можно двумя пальцами сразу</b>: у каждого своя линия и свой цвет,
+            руки работают одновременно, как в классической билатеральной практике. Каждый штрих
+            зеркалится. Здесь нет ошибок — есть только поток.
           </p>
         </HowTo>
         <div className="mirror-stats">

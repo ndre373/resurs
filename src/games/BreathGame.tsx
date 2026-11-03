@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState } from "react";
 import { controller } from "@/game/boot";
 import { voice } from "@/game/voice";
+import { haptic } from "@/game/haptics";
 import type { Difficulty, GameResult } from "@/game/types";
 import {
   BREATH_PATTERNS,
@@ -39,6 +40,14 @@ const SOFT_CUES = [
   "Тело помнит ритм…",
   "Просто следуйте за лотосом…",
 ];
+
+/** Tactile phase marks (Android): a short buzz on inhale, a double on hold,
+ *  a long one on exhale — so the practice works with eyes closed. */
+const PHASE_VIBRO: Record<BreathPhase, number[]> = {
+  in: [35],
+  hold: [25, 50, 25],
+  out: [80],
+};
 
 function pluralCycles(n: number): string {
   const m10 = n % 10;
@@ -74,6 +83,7 @@ export function BreathGame(props: {
       setState(s);
       if (s.phase !== lastPhase) {
         lastPhase = s.phase;
+        haptic(PHASE_VIBRO[s.phase]);
         if (s.cycle < guidedCycles) {
           // lead every phase at the start…
           voice.cue(PHASE_CUE[s.phase], controller.audio.muted);
@@ -133,7 +143,8 @@ export function BreathGame(props: {
       <HowTo>
         <p>
           Следуйте за лотосом: он раскрывается — <b>вдох</b>, закрывается — <b>выдох</b>, замирает —{" "}
-          <b>задержка</b>. Выберите ритм: когерентное дыхание (5·5) переключает нервную систему в
+          <b>задержка</b>. Смена фазы отдаётся лёгкой вибрацией (на Android) — можно дышать с
+          закрытыми глазами. Выберите ритм: когерентное дыхание (5·5) переключает нервную систему в
           ресурсный режим, 4-7-8 глубоко расслабляет, «квадрат» собирает внимание. Суфлёр ведёт
           первые циклы, потом затихает — дыхание продолжается само.
         </p>

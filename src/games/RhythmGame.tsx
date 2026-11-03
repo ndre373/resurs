@@ -17,7 +17,13 @@ type Phase = "ready" | "show" | "input" | "success" | "fail";
 
 function makePattern(len: number): Hand[] {
   const p: Hand[] = [];
-  for (let i = 0; i < len; i++) p.push(Math.random() < 0.5 ? "L" : "R");
+  for (let i = 0; i < len; i++) {
+    let h: Hand = Math.random() < 0.5 ? "L" : "R";
+    // Never more than two taps in a row on the same hand: without alternation
+    // the pattern loses its cross-lateral load — the whole point of the game
+    if (i >= 2 && p[i - 1] === h && p[i - 2] === h) h = h === "L" ? "R" : "L";
+    p.push(h);
+  }
   return p;
 }
 

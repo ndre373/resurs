@@ -40,6 +40,17 @@ function randomTrial(): Trial {
   return { word, ink };
 }
 
+/** Answer buttons re-shuffle every round — otherwise motor memory learns the
+ *  fixed positions and the colour/word conflict gets bypassed entirely. */
+function shuffledColors(): Ink[] {
+  const a = [...COLORS6];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = (Math.random() * (i + 1)) | 0;
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
 export function StroopGame(props: {
   onDone: (r: GameResult) => void;
   rounds?: number;
@@ -53,6 +64,7 @@ export function StroopGame(props: {
   /** ms per word at the chosen difficulty. */
   const timeLimit = STROOP_DIFF[props.difficulty ?? "mid"];
   const [trial, setTrial] = useState<Trial>(() => randomTrial());
+  const [order, setOrder] = useState<Ink[]>(() => shuffledColors());
   const [round, setRound] = useState(1);
   const [correct, setCorrect] = useState(0);
   const [feedback, setFeedback] = useState<"good" | "bad" | null>(null);
@@ -114,6 +126,7 @@ export function StroopGame(props: {
     s.round++;
     setRound(s.round);
     setTrial(randomTrial());
+    setOrder(shuffledColors());
   }, [finish]);
 
   const scheduleDeadline = useCallback(() => {
@@ -178,7 +191,8 @@ export function StroopGame(props: {
       <HowTo>
         <p>
           Слово называет один цвет, а написано другим. Ваша задача — назвать <b>цвет букв</b>, а не
-          читать слово. Пример: слово «СИНИЙ», написанное красным — ответ «красный».
+          читать слово. Пример: слово «СИНИЙ», написанное красным — ответ «красный». Кнопки ответов
+          каждый раз меняются местами — привыкнуть к ним не выйдет.
         </p>
       </HowTo>
 
@@ -210,7 +224,7 @@ export function StroopGame(props: {
       </div>
 
       <div className="stroop-grid">
-        {COLORS6.map((c) => (
+        {order.map((c) => (
           <button
             key={c.name}
             className={`stroop-btn ${reveal === c.name ? "reveal" : ""}`}
