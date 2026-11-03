@@ -42,6 +42,9 @@ export interface GameStats {
 
 export type StatsMap = Partial<Record<GameId, GameStats>>;
 
+/** Difficulty picked on the ready gate: easy / mid (default) / hard. */
+export type Difficulty = "easy" | "mid" | "hard";
+
 export interface SessionRecord {
   at: number; // timestamp
   intention: string;

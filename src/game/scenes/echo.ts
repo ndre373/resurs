@@ -26,8 +26,18 @@ interface Orb {
 }
 
 export class EchoScene implements GameScene {
-  /** maxLen — длина цепочки, на которой игра завершается победой (выбор времени). */
-  constructor(private readonly maxLen: number = ECHO.MAX_LEN) {}
+  /**
+   * maxLen — цепочка победы в классическом режиме (без таймера);
+   * durationSec — режим на время: цепочка растёт, пока не выйдет время
+   * (Infinity = бесконечно, финиш кнопкой в HUD); showMs — темп вспышек.
+   */
+  constructor(
+    private readonly opts: {
+      maxLen?: number;
+      durationSec?: number;
+      showMs?: number;
+    } = {},
+  ) {}
 
   private ctx!: SceneContext;
   private group = new THREE.Group();
@@ -43,6 +53,15 @@ export class EchoScene implements GameScene {
   private best = 0;
   private strikes = 0;
   private disposed = false;
+  /** Elapsed play time — the timed mode ends the run when it reaches durationSec. */
+  private elapsed = 0;
+
+  private get maxLen(): number {
+    return this.opts.maxLen ?? ECHO.MAX_LEN;
+  }
+  private get showMs(): number {
+    return this.opts.showMs ?? ECHO.SHOW_MS;
+  }
   /** Camera aspect the orb arc was laid out for — relayout when it changes. */
   private laidOutAspect = 0;
 
@@ -186,6 +205,20 @@ export class EchoScene implements GameScene {
     // phone rotated / window resized → refit the arc into the new frame
     if (this.ctx.camera.aspect !== this.laidOutAspect) this.layout();
 
+    // timed mode: the run ends when the gate-chosen time runs out
+    if (this.opts.durationSec !== undefined) {
+      this.elapsed += dt;
+      if (Number.isFinite(this.opts.durationSec) && this.elapsed >= this.opts.durationSec) {
+        this.disposed = true;
+        this.ctx.finish({
+          game: "echo",
+          score: this.best,
+          detail: `цепочка до ${this.best} звуков · ошибок ${this.strikes}`,
+        });
+        return;
+      }
+    }
+
     for (const orb of this.orbs) {
       const mat = orb.mesh.material;
       if (orb.flash > 0) {
@@ -209,7 +242,7 @@ export class EchoScene implements GameScene {
           this.emitHud();
         } else {
           this.flashOrb(this.sequence[this.showIndex], true);
-          this.showTimer = ECHO.SHOW_MS / 1000;
+          this.showTimer = this.showMs / 1000;
           this.emitHud();
         }
       }
@@ -218,7 +251,8 @@ export class EchoScene implements GameScene {
       if (this.phasePause <= 0) {
         if (this.phase === "success") {
           const next = this.sequence.length + 1;
-          if (next > this.maxLen) {
+          // classic mode ends with a victory at maxLen; timed mode grows forever
+          if (this.opts.durationSec === undefined && next > this.maxLen) {
             this.ctx.finish({
               game: "echo",
               score: this.best,

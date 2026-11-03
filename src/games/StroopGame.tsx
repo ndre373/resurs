@@ -8,9 +8,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { controller } from "@/game/boot";
 import { voice } from "@/game/voice";
 import { pauseBus, pTimeout, pClear } from "@/game/pause";
-import { STROOP } from "@/game/config";
-import type { GameResult } from "@/game/types";
-import { HowTo } from "@/ui/common";
+import { STROOP, STROOP_DIFF } from "@/game/config";
+import type { Difficulty, GameResult } from "@/game/types";
+import { HowTo, useGameTimer } from "@/ui/common";
 
 interface Ink {
   name: string;
@@ -40,9 +40,18 @@ function randomTrial(): Trial {
   return { word, ink };
 }
 
-export function StroopGame(props: { onDone: (r: GameResult) => void; rounds?: number }) {
-  /** Run length picked on the ready gate (default from config). */
+export function StroopGame(props: {
+  onDone: (r: GameResult) => void;
+  rounds?: number;
+  /** Ready-gate time choice: finite seconds = timed run, Infinity = endless. */
+  durationSec?: number;
+  difficulty?: Difficulty;
+}) {
+  /** Run length in rounds — legacy/session mode (no durationSec given). */
   const totalRounds = props.rounds ?? STROOP.ROUNDS;
+  const timed = props.durationSec !== undefined;
+  /** ms per word at the chosen difficulty. */
+  const timeLimit = STROOP_DIFF[props.difficulty ?? "mid"];
   const [trial, setTrial] = useState<Trial>(() => randomTrial());
   const [round, setRound] = useState(1);
   const [correct, setCorrect] = useState(0);
@@ -85,14 +94,20 @@ export function StroopGame(props: { onDone: (r: GameResult) => void; rounds?: nu
     props.onDone({
       game: "stroop",
       score: s.correct,
-      detail: `${s.correct}/${totalRounds} верно · реакция ${avg} мс`,
+      detail: timed
+        ? `${s.correct} верно · реакция ${avg} мс`
+        : `${s.correct}/${totalRounds} верно · реакция ${avg} мс`,
       reactionMs: avg > 0 ? avg : undefined,
     });
-  }, [props]);
+  }, [props, timed, totalRounds]);
+
+  const finishRef = useRef(finish);
+  finishRef.current = finish;
+  const timer = useGameTimer(props.durationSec, () => finishRef.current());
 
   const nextRound = useCallback(() => {
     const s = stateRef.current;
-    if (s.round >= totalRounds) {
+    if (!timed && s.round >= totalRounds) {
       finish();
       return;
     }
@@ -113,15 +128,15 @@ export function StroopGame(props: { onDone: (r: GameResult) => void; rounds?: nu
         setReveal(null);
         nextRound();
       }, 600);
-    }, STROOP.TIME_LIMIT_MS);
-  }, [nextRound]);
+    }, timeLimit);
+  }, [nextRound, timeLimit]);
 
   useEffect(() => {
     shownAt.current = performance.now();
     scheduleDeadline();
     const tick = () => {
       if (!pauseBus.paused) {
-        setTimeLeft(Math.max(0, 1 - (performance.now() - shownAt.current) / STROOP.TIME_LIMIT_MS));
+        setTimeLeft(Math.max(0, 1 - (performance.now() - shownAt.current) / timeLimit));
       }
       raf.current = requestAnimationFrame(tick);
     };
@@ -169,10 +184,19 @@ export function StroopGame(props: { onDone: (r: GameResult) => void; rounds?: nu
 
       <div className="alphabet-progress">
         <div className="progress-track">
-          <div className="progress-fill" style={{ width: `${((round - 1) / totalRounds) * 100}%` }} />
+          <div
+            className="progress-fill"
+            style={{
+              width: timed
+                ? `${Number.isFinite(props.durationSec) ? Math.max(0, 100 - (timer.elapsed / (props.durationSec as number)) * 100) : 100}%`
+                : `${((round - 1) / totalRounds) * 100}%`,
+            }}
+          />
         </div>
         <span>
-          {round}/{totalRounds} · верно {correct}
+          {timer.active
+            ? `⏱ ${timer.text} · верно ${correct}`
+            : `${round}/${totalRounds} · верно ${correct}`}
         </span>
       </div>
 
@@ -198,6 +222,11 @@ export function StroopGame(props: { onDone: (r: GameResult) => void; rounds?: nu
           </button>
         ))}
       </div>
+      {timer.endless && (
+        <button className="btn ghost" onClick={() => finishRef.current()}>
+          Завершить
+        </button>
+      )}
     </div>
   );
 }

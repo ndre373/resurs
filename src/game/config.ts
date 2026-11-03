@@ -64,3 +64,35 @@ export const CROSS = {
   /** Max gap between the two corner touches to count as «simultaneous». */
   SYNC_MS: 500,
 } as const;
+
+// ---------------------------------------------------------- difficulty tiers
+// «mid» matches the classic constants above; easy/hard scale the challenge.
+
+/** Alphabet: answer window per cue (shrinks with the streak). */
+export const ALPHABET_DIFF = {
+  easy: { baseWindow: 4200, minWindow: 1800, shrink: 80 },
+  mid: { baseWindow: 3200, minWindow: 1400, shrink: 120 },
+  hard: { baseWindow: 2400, minWindow: 1000, shrink: 160 },
+} as const;
+
+/** Stroop: ms per word. */
+export const STROOP_DIFF = { easy: 6000, mid: 4000, hard: 2600 } as const;
+
+/** Echo: ms between orb flashes while the chain plays. */
+export const ECHO_DIFF = { easy: 850, mid: 620, hard: 460 } as const;
+
+/** Rhythm: beats per minute of the drum pattern. */
+export const RHYTHM_DIFF = { easy: 70, mid: 84, hard: 100 } as const;
+
+/** Cross: scale of the answer window + simultaneity gap. */
+export const CROSS_DIFF = {
+  easy: { scale: 1.3, syncMs: 650 },
+  mid: { scale: 1, syncMs: 500 },
+  hard: { scale: 0.75, syncMs: 360 },
+} as const;
+
+/** Flow: flight speed multiplier. */
+export const FLOW_DIFF = { easy: 0.75, mid: 1, hard: 1.3 } as const;
+
+/** Breath: how many cycles the voice prompter leads in detail. */
+export const BREATH_DIFF = { easy: 5, mid: 3, hard: 1 } as const;

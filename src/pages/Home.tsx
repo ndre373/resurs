@@ -15,7 +15,9 @@ import type { GameId, GameResult } from "@/game/types";
 import { getStats, getSessions, resetStats, recordResult, getStreak } from "@/game/stats";
 import { pauseBus } from "@/game/pause";
 import { GAME_META, GAME_ORDER } from "@/games/meta";
-import { TopBar, GameCard, ResultModal, PauseOverlay } from "@/ui/common";
+import { TopBar, GameCard, ResultModal, PauseOverlay, DURATION_OPTIONS } from "@/ui/common";
+import { getDefaultDuration } from "@/game/settings";
+import type { Difficulty } from "@/game/types";
 import { SessionFlow } from "@/ui/SessionFlow";
 import { ProgressView } from "@/ui/ProgressView";
 import { SettingsView } from "@/ui/SettingsView";
@@ -37,52 +39,12 @@ function isGameId(id: string): id is GameId {
   return id in GAME_META;
 }
 
-/** Games with a selectable run length (shown on the ready gate). */
-type LenChoice = "short" | "mid" | "long";
-const GAME_LENGTHS: Partial<
-  Record<GameId, { label: string; options: { id: LenChoice; label: string; value: number }[] }>
-> = {
-  echo: {
-    label: "Длина цепочки",
-    options: [
-      { id: "short", label: "Короткая · до 8", value: 8 },
-      { id: "mid", label: "Средняя · до 12", value: 12 },
-      { id: "long", label: "Длинная · до 16", value: 16 },
-    ],
-  },
-  rhythm: {
-    label: "Длина ритма",
-    options: [
-      { id: "short", label: "Короткий · до 6", value: 6 },
-      { id: "mid", label: "Средний · до 10", value: 10 },
-      { id: "long", label: "Длинный · до 14", value: 14 },
-    ],
-  },
-  alphabet: {
-    label: "Количество букв",
-    options: [
-      { id: "short", label: "Короткая · 12", value: 12 },
-      { id: "mid", label: "Средняя · 24", value: 24 },
-      { id: "long", label: "Длинная · 40", value: 40 },
-    ],
-  },
-  stroop: {
-    label: "Количество слов",
-    options: [
-      { id: "short", label: "Короткая · 12", value: 12 },
-      { id: "mid", label: "Средняя · 24", value: 24 },
-      { id: "long", label: "Длинная · 40", value: 40 },
-    ],
-  },
-  cross: {
-    label: "Количество диагоналей",
-    options: [
-      { id: "short", label: "Короткая · 6", value: 6 },
-      { id: "mid", label: "Средняя · 12", value: 12 },
-      { id: "long", label: "Длинная · 20", value: 20 },
-    ],
-  },
-};
+/** Every game gets the same two choices on the ready gate: time + difficulty. */
+const DIFFICULTY_OPTIONS: { id: Difficulty; label: string }[] = [
+  { id: "easy", label: "Лёгкая" },
+  { id: "mid", label: "Средняя" },
+  { id: "hard", label: "Сложная" },
+];
 
 /** Parse the URL into the shell's screen + (optional) active game. */
 function parsePath(pathname: string): { screen: Screen; game: GameId | null; badGame: boolean } {
@@ -121,8 +83,9 @@ export default function Home() {
   // games never start on their own: a "ready" gate with a big start button
   // comes first — the player reads the rules, then launches the round
   const [gameReady, setGameReady] = useState(false);
-  // run length picked on the ready gate (games listed in GAME_LENGTHS)
-  const [lenChoice, setLenChoice] = useState<LenChoice>("mid");
+  // ready-gate choices: run length in minutes (0 = endless) + difficulty tier
+  const [minutes, setMinutes] = useState(getDefaultDuration);
+  const [difficulty, setDifficulty] = useState<Difficulty>("mid");
   const [stats, setStats] = useState(getStats());
   const [sessionsCount, setSessionsCount] = useState(getSessions().length);
   const [streak, setStreak] = useState(getStreak().current);
@@ -192,29 +155,34 @@ export default function Home() {
     setResult(r);
   }, []);
 
-  /** Selected run length for games that offer the choice (Echo, Rhythm). */
-  const pickedLen = (id: GameId): number | undefined =>
-    GAME_LENGTHS[id]?.options.find((o) => o.id === lenChoice)?.value;
+  /** Selected run length in seconds; Infinity = endless mode. */
+  const durationSec = minutes === 0 ? Infinity : minutes * 60;
 
   const renderGame = (id: GameId) => {
     const done = handleDone;
     switch (id) {
       case "alphabet":
-        return <AlphabetGame onDone={done} rounds={pickedLen(id)} />;
+        return <AlphabetGame onDone={done} durationSec={durationSec} difficulty={difficulty} />;
       case "stroop":
-        return <StroopGame onDone={done} rounds={pickedLen(id)} />;
+        return <StroopGame onDone={done} durationSec={durationSec} difficulty={difficulty} />;
       case "rhythm":
-        return <RhythmGame onDone={done} maxSteps={pickedLen(id)} />;
+        return <RhythmGame onDone={done} durationSec={durationSec} difficulty={difficulty} />;
       case "mirror":
-        return <MirrorGame onDone={done} />;
+        return (
+          <MirrorGame
+            onDone={done}
+            autoFinishSec={Number.isFinite(durationSec) ? durationSec : undefined}
+            difficulty={difficulty}
+          />
+        );
       case "breath":
-        return <BreathGame onDone={done} />;
+        return <BreathGame onDone={done} durationMin={minutes} difficulty={difficulty} />;
       case "echo":
-        return <EchoGame onDone={done} maxLen={pickedLen(id)} />;
+        return <EchoGame onDone={done} durationSec={durationSec} difficulty={difficulty} />;
       case "flow":
-        return <FlowGame onDone={done} />;
+        return <FlowGame onDone={done} durationSec={durationSec} difficulty={difficulty} />;
       case "cross":
-        return <CrossGame onDone={done} rounds={pickedLen(id)} />;
+        return <CrossGame onDone={done} durationSec={durationSec} difficulty={difficulty} />;
     }
   };
 
@@ -387,25 +355,40 @@ export default function Home() {
                       </span>
                     ))}
                   </div>
-                  {GAME_LENGTHS[game] && (
-                    <div className="ready-len">
-                      <div className="ready-len-label">{GAME_LENGTHS[game].label}</div>
-                      <div className="chips">
-                        {GAME_LENGTHS[game].options.map((o) => (
-                          <button
-                            key={o.id}
-                            className={`chip ${lenChoice === o.id ? "on" : ""}`}
-                            onClick={() => {
-                              controller.audio.sfx("ui");
-                              setLenChoice(o.id);
-                            }}
-                          >
-                            {o.label}
-                          </button>
-                        ))}
-                      </div>
+                  <div className="ready-len">
+                    <div className="ready-len-label">Время</div>
+                    <div className="chips">
+                      {DURATION_OPTIONS.map((m) => (
+                        <button
+                          key={m}
+                          className={`chip ${minutes === m ? "on" : ""}`}
+                          onClick={() => {
+                            controller.audio.sfx("ui");
+                            setMinutes(m);
+                          }}
+                        >
+                          {m === 0 ? "∞" : `${m} мин`}
+                        </button>
+                      ))}
                     </div>
-                  )}
+                  </div>
+                  <div className="ready-len">
+                    <div className="ready-len-label">Сложность</div>
+                    <div className="chips">
+                      {DIFFICULTY_OPTIONS.map((d) => (
+                        <button
+                          key={d.id}
+                          className={`chip ${difficulty === d.id ? "on" : ""}`}
+                          onClick={() => {
+                            controller.audio.sfx("ui");
+                            setDifficulty(d.id);
+                          }}
+                        >
+                          {d.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <button
                     className="btn primary big"
                     autoFocus

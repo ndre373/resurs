@@ -9,9 +9,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { controller } from "@/game/boot";
 import { voice } from "@/game/voice";
 import { pauseBus, pTimeout, pClear } from "@/game/pause";
-import { ALPHABET } from "@/game/config";
-import type { GameResult } from "@/game/types";
-import { HowTo } from "@/ui/common";
+import { ALPHABET, ALPHABET_DIFF } from "@/game/config";
+import type { Difficulty, GameResult } from "@/game/types";
+import { HowTo, useGameTimer } from "@/ui/common";
 
 type Cue = "Л" | "П" | "О";
 const LETTERS = "АБВГДЕЖЗИКЛМНОПРСТУФХЦЧШЭЮЯ".split("");
@@ -33,9 +33,18 @@ function randomTrial(prev?: Trial): Trial {
   return t;
 }
 
-export function AlphabetGame(props: { onDone: (r: GameResult) => void; rounds?: number }) {
-  /** Run length picked on the ready gate (default from config). */
+export function AlphabetGame(props: {
+  onDone: (r: GameResult) => void;
+  rounds?: number;
+  /** Ready-gate time choice: finite seconds = timed run, Infinity = endless. */
+  durationSec?: number;
+  difficulty?: Difficulty;
+}) {
+  /** Run length in rounds — legacy/session mode (no durationSec given). */
   const totalRounds = props.rounds ?? ALPHABET.ROUNDS;
+  /** Timer mode is on when the gate passed a duration. */
+  const timed = props.durationSec !== undefined;
+  const diff = ALPHABET_DIFF[props.difficulty ?? "mid"];
   const [trial, setTrial] = useState<Trial>(() => randomTrial());
   const [round, setRound] = useState(1);
   const [streak, setStreak] = useState(0);
@@ -43,7 +52,7 @@ export function AlphabetGame(props: { onDone: (r: GameResult) => void; rounds?: 
   const [feedback, setFeedback] = useState<"good" | "bad" | null>(null);
   /** Correct cue highlighted after a mistake/timeout — the learning moment. */
   const [reveal, setReveal] = useState<Cue | null>(null);
-  const [windowMs, setWindowMs] = useState<number>(ALPHABET.BASE_WINDOW);
+  const [windowMs, setWindowMs] = useState<number>(diff.baseWindow);
   const [timeLeft, setTimeLeft] = useState(1);
 
   const stateRef = useRef({ round: 1, streak: 0, correct: 0, times: [] as number[], done: false });
@@ -80,25 +89,31 @@ export function AlphabetGame(props: { onDone: (r: GameResult) => void; rounds?: 
     props.onDone({
       game: "alphabet",
       score: s.correct,
-      detail: `${s.correct}/${totalRounds} верно · реакция ${avg} мс`,
+      detail: timed
+        ? `${s.correct} верно · реакция ${avg} мс`
+        : `${s.correct}/${totalRounds} верно · реакция ${avg} мс`,
       reactionMs: avg > 0 ? avg : undefined,
     });
-  }, [props]);
+  }, [props, timed, totalRounds]);
+
+  const finishRef = useRef(finish);
+  finishRef.current = finish;
+  const timer = useGameTimer(props.durationSec, () => finishRef.current());
 
   const nextRound = useCallback(() => {
     const s = stateRef.current;
-    if (s.round >= totalRounds) {
+    if (!timed && s.round >= totalRounds) {
       finish();
       return;
     }
     s.round++;
-    const w = Math.max(ALPHABET.MIN_WINDOW, ALPHABET.BASE_WINDOW - s.streak * 120);
+    const w = Math.max(diff.minWindow, diff.baseWindow - s.streak * diff.shrink);
     setWindowMs(w);
     setRound(s.round);
     setTrial((prev) => randomTrial(prev));
     shownAt.current = performance.now();
     scheduleDeadline(w);
-  }, [finish]);
+  }, [finish, timed, totalRounds, diff]);
 
   const scheduleDeadline = useCallback(
     (w: number) => {
@@ -209,10 +224,19 @@ export function AlphabetGame(props: { onDone: (r: GameResult) => void; rounds?: 
 
       <div className="alphabet-progress">
         <div className="progress-track">
-          <div className="progress-fill" style={{ width: `${((round - 1) / totalRounds) * 100}%` }} />
+          <div
+            className="progress-fill"
+            style={{
+              width: timed
+                ? `${Number.isFinite(props.durationSec) ? Math.max(0, 100 - (timer.elapsed / (props.durationSec as number)) * 100) : 100}%`
+                : `${((round - 1) / totalRounds) * 100}%`,
+            }}
+          />
         </div>
         <span>
-          {round}/{totalRounds} · серия {streak} · верно {correct}
+          {timer.active
+            ? `⏱ ${timer.text} · верно ${correct} · серия ${streak}`
+            : `${round}/${totalRounds} · серия ${streak} · верно ${correct}`}
         </span>
       </div>
 
@@ -244,6 +268,11 @@ export function AlphabetGame(props: { onDone: (r: GameResult) => void; rounds?: 
           ▶<span>правая</span>
         </button>
       </div>
+      {timer.endless && (
+        <button className="btn ghost" onClick={() => finishRef.current()}>
+          Завершить
+        </button>
+      )}
     </div>
   );
 }

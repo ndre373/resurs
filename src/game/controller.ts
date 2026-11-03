@@ -192,7 +192,14 @@ class Controller {
   /** Lazy scene modules — each scene code-splits into its own chunk. */
   private static async createScene(
     name: SceneName,
-    opts?: { cycles?: number; durationSec?: number; breathPattern?: BreathPattern; maxLen?: number },
+    opts?: {
+      cycles?: number;
+      durationSec?: number;
+      breathPattern?: BreathPattern;
+      maxLen?: number;
+      showMs?: number;
+      speedScale?: number;
+    },
   ): Promise<GameScene> {
     if (name === "breath") {
       const m = await import("./scenes/breath");
@@ -200,15 +207,26 @@ class Controller {
     }
     if (name === "echo") {
       const m = await import("./scenes/echo");
-      return new m.EchoScene(opts?.maxLen);
+      return new m.EchoScene({
+        maxLen: opts?.maxLen,
+        durationSec: opts?.durationSec,
+        showMs: opts?.showMs,
+      });
     }
     const m = await import("./scenes/flow");
-    return new m.FlowScene(opts?.durationSec);
+    return new m.FlowScene(opts?.durationSec, opts?.speedScale);
   }
 
   enterScene(
     name: SceneName,
-    opts?: { cycles?: number; durationSec?: number; breathPattern?: BreathPattern; maxLen?: number },
+    opts?: {
+      cycles?: number;
+      durationSec?: number;
+      breathPattern?: BreathPattern;
+      maxLen?: number;
+      showMs?: number;
+      speedScale?: number;
+    },
   ): void {
     this.exitScene();
     pauseBus.set(false); // a fresh scene never starts paused

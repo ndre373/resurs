@@ -7,15 +7,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { controller } from "@/game/boot";
 import { voice } from "@/game/voice";
-import { RHYTHM } from "@/game/config";
-import type { GameResult } from "@/game/types";
-import { HowTo } from "@/ui/common";
+import { RHYTHM, RHYTHM_DIFF } from "@/game/config";
+import type { Difficulty, GameResult } from "@/game/types";
+import { HowTo, useGameTimer } from "@/ui/common";
 import { pauseBus, pTimeout, pClear } from "@/game/pause";
 
 type Hand = "L" | "R";
 type Phase = "ready" | "show" | "input" | "success" | "fail";
-
-const BEAT = 60000 / RHYTHM.BPM;
 
 function makePattern(len: number): Hand[] {
   const p: Hand[] = [];
@@ -23,7 +21,17 @@ function makePattern(len: number): Hand[] {
   return p;
 }
 
-export function RhythmGame(props: { onDone: (r: GameResult) => void; maxSteps?: number }) {
+export function RhythmGame(props: {
+  onDone: (r: GameResult) => void;
+  maxSteps?: number;
+  /** Ready-gate time choice: finite seconds = timed run, Infinity = endless. */
+  durationSec?: number;
+  difficulty?: Difficulty;
+}) {
+  /** Beat interval (ms) follows the chosen difficulty. */
+  const beat = 60000 / RHYTHM_DIFF[props.difficulty ?? "mid"];
+  /** Timer mode is on when the gate passed a duration. */
+  const timed = props.durationSec !== undefined;
   const [phase, setPhase] = useState<Phase>("ready");
   const [pattern, setPattern] = useState<Hand[]>(() => makePattern(RHYTHM.START_STEPS));
   const [activeStep, setActiveStep] = useState(-1);
@@ -71,30 +79,37 @@ export function RhythmGame(props: { onDone: (r: GameResult) => void; maxSteps?: 
     });
   }, [props]);
 
-  const playPattern = useCallback((p: Hand[]) => {
-    clearTimers();
-    setPhase("show");
-    ref.current.phase = "show";
-    setActiveStep(-1);
-    setInputCount(0);
-    ref.current.inputPos = 0;
-    p.forEach((hand, i) => {
+  const finishRef = useRef(finish);
+  finishRef.current = finish;
+  const timer = useGameTimer(props.durationSec, () => finishRef.current());
+
+  const playPattern = useCallback(
+    (p: Hand[]) => {
+      clearTimers();
+      setPhase("show");
+      ref.current.phase = "show";
+      setActiveStep(-1);
+      setInputCount(0);
+      ref.current.inputPos = 0;
+      p.forEach((hand, i) => {
+        timers.current.push(
+          pTimeout(() => {
+            setActiveStep(i);
+            controller.audio.sfx(hand === "L" ? "tomL" : "tomR");
+            controller.burst(hand === "L" ? -1 : 1, true, 8);
+          }, 500 + i * beat),
+        );
+      });
       timers.current.push(
         pTimeout(() => {
-          setActiveStep(i);
-          controller.audio.sfx(hand === "L" ? "tomL" : "tomR");
-          controller.burst(hand === "L" ? -1 : 1, true, 8);
-        }, 500 + i * BEAT),
+          setActiveStep(-1);
+          setPhase("input");
+          ref.current.phase = "input";
+        }, 500 + p.length * beat + 200),
       );
-    });
-    timers.current.push(
-      pTimeout(() => {
-        setActiveStep(-1);
-        setPhase("input");
-        ref.current.phase = "input";
-      }, 500 + p.length * BEAT + 200),
-    );
-  }, []);
+    },
+    [beat],
+  );
 
   const nextLevel = useCallback(
     (len: number) => {
@@ -119,7 +134,8 @@ export function RhythmGame(props: { onDone: (r: GameResult) => void; maxSteps?: 
         if (s.inputPos >= s.pattern.length) {
           s.best = Math.max(s.best, s.pattern.length);
           setBest(s.best);
-          if (s.pattern.length >= (props.maxSteps ?? RHYTHM.MAX_STEPS)) {
+          // in timer mode the pattern grows until the time is out
+          if (!timed && s.pattern.length >= (props.maxSteps ?? RHYTHM.MAX_STEPS)) {
             finish();
             return;
           }
@@ -142,7 +158,7 @@ export function RhythmGame(props: { onDone: (r: GameResult) => void; maxSteps?: 
         timers.current.push(pTimeout(() => nextLevel(s.pattern.length), 1200));
       }
     },
-    [finish, nextLevel],
+    [finish, nextLevel, timed, props.maxSteps],
   );
 
   useEffect(() => {
@@ -179,7 +195,8 @@ export function RhythmGame(props: { onDone: (r: GameResult) => void; maxSteps?: 
       <div className="rhythm-status">
         <div className="rhythm-phase">{phaseLabel[phase]}</div>
         <div className="rhythm-meta">
-          длина {pattern.length} · лучший {best} · ошибки {strikes}/3
+          {timer.active ? `⏱ ${timer.text} · ` : ""}длина {pattern.length} · лучший {best} · ошибки{" "}
+          {strikes}/3
         </div>
       </div>
 
@@ -216,6 +233,11 @@ export function RhythmGame(props: { onDone: (r: GameResult) => void; maxSteps?: 
             ПРАВАЯ
           </button>
         </div>
+      )}
+      {timer.endless && phase !== "ready" && (
+        <button className="btn ghost" onClick={() => finishRef.current()}>
+          Завершить
+        </button>
       )}
     </div>
   );

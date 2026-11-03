@@ -8,7 +8,7 @@
 import { useEffect, useRef, useState } from "react";
 import { controller } from "@/game/boot";
 import { voice } from "@/game/voice";
-import type { GameResult } from "@/game/types";
+import type { Difficulty, GameResult } from "@/game/types";
 import {
   BREATH_PATTERNS,
   patternById,
@@ -16,8 +16,9 @@ import {
   type BreathPhase,
 } from "@/game/breathPatterns";
 import type { BreathState } from "@/game/scenes/breath";
-import { DurationChips, HowTo } from "@/ui/common";
+import { HowTo } from "@/ui/common";
 import { getDefaultDuration } from "@/game/settings";
+import { BREATH_DIFF } from "@/game/config";
 
 const cycleSeconds = (p: BreathPattern): number => p.steps.reduce((s, x) => s + x.sec, 0);
 
@@ -38,8 +39,6 @@ const SOFT_CUES = [
   "Тело помнит ритм…",
   "Просто следуйте за лотосом…",
 ];
-/** How many first cycles the prompter guides every phase. */
-const GUIDED_CYCLES = 3;
 
 function pluralCycles(n: number): string {
   const m10 = n % 10;
@@ -52,16 +51,21 @@ function pluralCycles(n: number): string {
 export function BreathGame(props: {
   onDone: (r: GameResult) => void;
   cycles?: number;
+  /** Ready-gate time choice in minutes (0 = endless). Overrides the saved default. */
+  durationMin?: number;
+  difficulty?: Difficulty;
 }) {
   const [state, setState] = useState<BreathState | null>(null);
   // In session mode (props.cycles) the duration is fixed — no selector.
   const sessionMode = props.cycles !== undefined;
-  const [minutes, setMinutes] = useState(getDefaultDuration);
+  const minutes = props.durationMin ?? getDefaultDuration();
   const [patternId, setPatternId] = useState(BREATH_PATTERNS[0].id);
   const stateRef = useRef<BreathState | null>(null);
   stateRef.current = state;
 
   const pattern = patternById(patternId);
+  /** How many first cycles the prompter leads in detail — follows difficulty. */
+  const guidedCycles = BREATH_DIFF[props.difficulty ?? "mid"];
 
   useEffect(() => {
     let lastPhase: string | null = null;
@@ -70,7 +74,7 @@ export function BreathGame(props: {
       setState(s);
       if (s.phase !== lastPhase) {
         lastPhase = s.phase;
-        if (s.cycle < GUIDED_CYCLES) {
+        if (s.cycle < guidedCycles) {
           // lead every phase at the start…
           voice.cue(PHASE_CUE[s.phase], controller.audio.muted);
         } else if (s.phase === "in" && s.cycle % 3 === 0) {
@@ -153,12 +157,10 @@ export function BreathGame(props: {
           ))}
         </div>
       )}
-      {!sessionMode && (
-        <DurationChips
-          value={minutes}
-          onChange={setMinutes}
-          onFinish={endless ? finishEndless : undefined}
-        />
+      {endless && (
+        <button className="btn ghost" onClick={finishEndless}>
+          Завершить
+        </button>
       )}
     </div>
   );

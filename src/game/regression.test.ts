@@ -37,7 +37,7 @@ function stubCtx(aspect = PHONE_ASPECT) {
 
 describe("echo scene", () => {
   it("never repeats the same orb twice in a row", () => {
-    const e = new EchoScene(16);
+    const e = new EchoScene({ maxLen: 16 });
     const ctx = stubCtx();
     e.enter(ctx as never);
     try {
@@ -54,7 +54,7 @@ describe("echo scene", () => {
   });
 
   it("keeps every orb inside the frame on a portrait phone", () => {
-    const e = new EchoScene(12);
+    const e = new EchoScene({ maxLen: 12 });
     const ctx = stubCtx(PHONE_ASPECT);
     e.enter(ctx as never);
     try {

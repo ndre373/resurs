@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { controller } from "@/game/boot";
 import { voice } from "@/game/voice";
-import type { GameResult } from "@/game/types";
+import type { Difficulty, GameResult } from "@/game/types";
 import { HowTo } from "@/ui/common";
 import { pInterval, pClear } from "@/game/pause";
 
@@ -23,11 +23,13 @@ function pluralStrokes(n: number): string {
 
 export function MirrorGame(props: {
   onDone: (r: GameResult) => void;
-  /** Session mode: finish automatically after N seconds. */
+  /** Session mode / ready-gate time: finish automatically after N seconds. */
   autoFinishSec?: number;
+  /** Hard mode starts in the 4-way kaleidoscope. */
+  difficulty?: Difficulty;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [fourWay, setFourWay] = useState(false);
+  const [fourWay, setFourWay] = useState(props.difficulty === "hard");
   const [secondsLeft, setSecondsLeft] = useState(props.autoFinishSec ?? 0);
   const [strokes, setStrokes] = useState(0);
 

@@ -3,7 +3,7 @@
  * result modal, "how to play" panel. All Russian UI copy lives with the games.
  */
 
-import { Component, useEffect, useState, type ReactNode } from "react";
+import { Component, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ArrowLeft,
   Volume2,
@@ -300,4 +300,62 @@ export function DurationChips(props: {
       </div>
     </div>
   );
+}
+
+// ------------------------------------------------------------- game timer
+
+/** Formats seconds as m:ss for the game HUD. */
+export function fmtTime(totalSec: number): string {
+  const s = Math.max(0, Math.floor(totalSec));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+export interface GameTimer {
+  /** Remaining time "м:сс" (timed run) or elapsed time (endless run). */
+  text: string;
+  /** True for an endless run — the game shows its own «Завершить» button. */
+  endless: boolean;
+  /** Seconds since the run started (pause-aware). */
+  elapsed: number;
+  active: boolean;
+}
+
+/**
+ * Shared run timer for the ready-gate duration choice.
+ * durationSec: finite = auto-finish at zero; Infinity = endless; undefined =
+ * legacy round-based mode (timer inactive). Pauses with the app.
+ */
+export function useGameTimer(durationSec: number | undefined, onTimeout: () => void): GameTimer {
+  const [elapsed, setElapsed] = useState(0);
+  const timeoutRef = useRef(onTimeout);
+  timeoutRef.current = onTimeout;
+  const active = durationSec !== undefined;
+
+  useEffect(() => {
+    if (durationSec === undefined) return;
+    let acc = 0;
+    let last = performance.now();
+    let fired = false;
+    setElapsed(0);
+    const iv = setInterval(() => {
+      const now = performance.now();
+      if (!pauseBus.paused) acc += (now - last) / 1000;
+      last = now;
+      setElapsed(acc);
+      if (Number.isFinite(durationSec) && acc >= durationSec && !fired) {
+        fired = true;
+        timeoutRef.current();
+      }
+    }, 250);
+    return () => clearInterval(iv);
+  }, [durationSec]);
+
+  const endless = durationSec === Infinity;
+  const text =
+    durationSec === undefined
+      ? ""
+      : endless
+        ? fmtTime(elapsed)
+        : fmtTime(Math.max(0, (durationSec as number) - elapsed));
+  return { text, endless, elapsed, active };
 }

@@ -26,7 +26,11 @@ interface Ring {
 }
 
 export class FlowScene implements GameScene {
-  constructor(durationSec?: number) {
+  constructor(
+    durationSec?: number,
+    /** Difficulty speed multiplier (easy 0.75 / mid 1 / hard 1.3). */
+    private readonly speedScale: number = 1,
+  ) {
     if (durationSec && durationSec > 0) this.duration = durationSec;
   }
 
@@ -195,7 +199,7 @@ export class FlowScene implements GameScene {
     const k = Number.isFinite(this.duration)
       ? Math.min(1, this.elapsed / this.duration)
       : Math.min(1, this.elapsed / 120); // бесконечный режим: скорость выходит на плато за 2 минуты
-    return FLOW.START_SPEED + (FLOW.MAX_SPEED - FLOW.START_SPEED) * k;
+    return (FLOW.START_SPEED + (FLOW.MAX_SPEED - FLOW.START_SPEED) * k) * this.speedScale;
   }
 
   private emitHud(): void {

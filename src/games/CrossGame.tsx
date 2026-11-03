@@ -9,9 +9,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { controller } from "@/game/boot";
 import { voice } from "@/game/voice";
-import { CROSS } from "@/game/config";
-import type { GameResult } from "@/game/types";
-import { HowTo } from "@/ui/common";
+import { CROSS, CROSS_DIFF } from "@/game/config";
+import type { Difficulty, GameResult } from "@/game/types";
+import { HowTo, useGameTimer } from "@/ui/common";
 import { pauseBus, pTimeout, pClear } from "@/game/pause";
 
 type PadId = "tl" | "tr" | "bl" | "br";
@@ -34,9 +34,20 @@ const PAD_KEY: Record<string, PadId> = { KeyQ: "tl", KeyE: "tr", KeyZ: "bl", Key
 
 const otherDiag = (d: Diag): Diag => (d === "main" ? "anti" : "main");
 
-export function CrossGame(props: { onDone: (r: GameResult) => void; rounds?: number }) {
-  /** Run length picked on the ready gate (default from config). */
+export function CrossGame(props: {
+  onDone: (r: GameResult) => void;
+  rounds?: number;
+  /** Ready-gate time choice: finite seconds = timed run, Infinity = endless. */
+  durationSec?: number;
+  difficulty?: Difficulty;
+}) {
+  /** Run length in rounds — legacy/session mode (no durationSec given). */
   const totalRounds = props.rounds ?? CROSS.ROUNDS;
+  const timed = props.durationSec !== undefined;
+  const diff = CROSS_DIFF[props.difficulty ?? "mid"];
+  const startWindow = Math.round(CROSS.START_WINDOW * diff.scale);
+  const minWindow = Math.round(CROSS.MIN_WINDOW * diff.scale);
+  const syncMs = diff.syncMs;
   const [phase, setPhase] = useState<Phase>("ready");
   const [cue, setCue] = useState<Diag>("main");
   const [hits, setHits] = useState<PadId[]>([]);
@@ -52,7 +63,7 @@ export function CrossGame(props: { onDone: (r: GameResult) => void; rounds?: num
     score: 0,
     strikes: 0,
     done: false,
-    window: CROSS.START_WINDOW as number,
+    window: startWindow as number,
   });
   const timers = useRef<number[]>([]);
 
@@ -81,15 +92,21 @@ export function CrossGame(props: { onDone: (r: GameResult) => void; rounds?: num
     props.onDone({
       game: "cross",
       score: s.score,
-      detail: `${s.score} из ${totalRounds} диагоналей · ошибок ${s.strikes}`,
+      detail: timed
+        ? `${s.score} диагоналей · ошибок ${s.strikes}`
+        : `${s.score} из ${totalRounds} диагоналей · ошибок ${s.strikes}`,
     });
-  }, [props]);
+  }, [props, timed, totalRounds]);
+
+  const finishRef = useRef(finish);
+  finishRef.current = finish;
+  const timer = useGameTimer(props.durationSec, () => finishRef.current());
 
   const nextCue = useCallback(
     (roundNo: number) => {
       const s = ref.current;
       if (s.done) return;
-      if (roundNo >= totalRounds) {
+      if (!timed && roundNo >= totalRounds) {
         finish();
         return;
       }
@@ -99,8 +116,8 @@ export function CrossGame(props: { onDone: (r: GameResult) => void; rounds?: num
       s.round = roundNo;
       s.hits.clear();
       s.window = Math.max(
-        CROSS.MIN_WINDOW,
-        CROSS.START_WINDOW - roundNo * ((CROSS.START_WINDOW - CROSS.MIN_WINDOW) / totalRounds),
+        minWindow,
+        startWindow - roundNo * ((startWindow - minWindow) / totalRounds),
       );
       s.phase = "input";
       setCue(next);
@@ -125,7 +142,7 @@ export function CrossGame(props: { onDone: (r: GameResult) => void; rounds?: num
         }, s.window),
       );
     },
-    [finish],
+    [finish, timed, totalRounds, startWindow, minWindow],
   );
 
   const start = useCallback(() => {
@@ -150,7 +167,7 @@ export function CrossGame(props: { onDone: (r: GameResult) => void; rounds?: num
         controller.audio.sfx(pad === "tl" || pad === "bl" ? "tomL" : "tomR");
         if (s.hits.size === 2) {
           const [t1, t2] = [...s.hits.values()];
-          if (Math.abs(t1 - t2) <= CROSS.SYNC_MS) {
+          if (Math.abs(t1 - t2) <= syncMs) {
             // both corners within the simultaneity window — a clean cross
             s.score++;
             setScore(s.score);
@@ -169,7 +186,7 @@ export function CrossGame(props: { onDone: (r: GameResult) => void; rounds?: num
                 s.hits.clear();
                 setHits([]);
                 controller.audio.sfx("tick");
-              }, CROSS.SYNC_MS),
+              }, syncMs),
             );
           }
         }
@@ -187,7 +204,7 @@ export function CrossGame(props: { onDone: (r: GameResult) => void; rounds?: num
         timers.current.push(pTimeout(() => nextCue(s.round + 1), 900));
       }
     },
-    [finish, nextCue],
+    [finish, nextCue, syncMs],
   );
 
   // keyboard: the Q/E/Z/C keys mirror the four screen corners — press the two
@@ -232,8 +249,9 @@ export function CrossGame(props: { onDone: (r: GameResult) => void; rounds?: num
       <div className="cross-status">
         <div className="cross-cue">{statusText}</div>
         <div className="cross-meta">
-          пара {Math.min(round + 1, totalRounds)} из {totalRounds} · верно {score} · ошибки{" "}
-          {strikes}/3
+          {timer.active
+            ? `⏱ ${timer.text} · верно ${score} · ошибки ${strikes}/3`
+            : `пара ${Math.min(round + 1, totalRounds)} из ${totalRounds} · верно ${score} · ошибки ${strikes}/3`}
         </div>
       </div>
 
@@ -260,6 +278,11 @@ export function CrossGame(props: { onDone: (r: GameResult) => void; rounds?: num
             </button>
           ))}
         </div>
+      )}
+      {timer.endless && phase !== "ready" && (
+        <button className="btn ghost" onClick={() => finishRef.current()}>
+          Завершить
+        </button>
       )}
     </div>
   );
