@@ -13,7 +13,6 @@ import { Sparkles, Flame, Settings, Play, BookOpen } from "lucide-react";
 import { startGame, stopGame, controller } from "@/game/boot";
 import type { GameId, GameResult } from "@/game/types";
 import { getStats, getSessions, resetStats, recordResult, getStreak } from "@/game/stats";
-import { getSyncCode, pullFromCloud, schedulePush } from "@/game/sync";
 import { pauseBus } from "@/game/pause";
 import { GAME_META, GAME_ORDER } from "@/games/meta";
 import { TopBar, GameCard, ResultModal, PauseOverlay } from "@/ui/common";
@@ -57,6 +56,30 @@ const GAME_LENGTHS: Partial<
       { id: "short", label: "Короткий · до 6", value: 6 },
       { id: "mid", label: "Средний · до 10", value: 10 },
       { id: "long", label: "Длинный · до 14", value: 14 },
+    ],
+  },
+  alphabet: {
+    label: "Количество букв",
+    options: [
+      { id: "short", label: "Короткая · 12", value: 12 },
+      { id: "mid", label: "Средняя · 24", value: 24 },
+      { id: "long", label: "Длинная · 40", value: 40 },
+    ],
+  },
+  stroop: {
+    label: "Количество слов",
+    options: [
+      { id: "short", label: "Короткая · 12", value: 12 },
+      { id: "mid", label: "Средняя · 24", value: 24 },
+      { id: "long", label: "Длинная · 40", value: 40 },
+    ],
+  },
+  cross: {
+    label: "Количество диагоналей",
+    options: [
+      { id: "short", label: "Короткая · 6", value: 6 },
+      { id: "mid", label: "Средняя · 12", value: 12 },
+      { id: "long", label: "Длинная · 20", value: 20 },
     ],
   },
 };
@@ -125,18 +148,6 @@ export default function Home() {
     return () => window.removeEventListener("pwa:update", onUpdate);
   }, []);
 
-  // Cloud sync: if a sync code exists, pull & merge the cloud stats once on start
-  useEffect(() => {
-    if (!getSyncCode()) return;
-    void pullFromCloud().then((r) => {
-      if (r === "merged") {
-        setStats(getStats());
-        setSessionsCount(getSessions().length);
-        setStreak(getStreak().current);
-      }
-    });
-  }, []);
-
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -179,7 +190,6 @@ export default function Home() {
     setSessionsCount(getSessions().length);
     setStreak(getStreak().current);
     setResult(r);
-    schedulePush(); // cloud backup when a sync code is connected
   }, []);
 
   /** Selected run length for games that offer the choice (Echo, Rhythm). */
@@ -190,9 +200,9 @@ export default function Home() {
     const done = handleDone;
     switch (id) {
       case "alphabet":
-        return <AlphabetGame onDone={done} />;
+        return <AlphabetGame onDone={done} rounds={pickedLen(id)} />;
       case "stroop":
-        return <StroopGame onDone={done} />;
+        return <StroopGame onDone={done} rounds={pickedLen(id)} />;
       case "rhythm":
         return <RhythmGame onDone={done} maxSteps={pickedLen(id)} />;
       case "mirror":
@@ -204,7 +214,7 @@ export default function Home() {
       case "flow":
         return <FlowGame onDone={done} />;
       case "cross":
-        return <CrossGame onDone={done} />;
+        return <CrossGame onDone={done} rounds={pickedLen(id)} />;
     }
   };
 
@@ -233,6 +243,17 @@ export default function Home() {
               8 игр перезагружают зрение, слух, кинестетику, тактильность и эмоции — и включают
               оба полушария синхронно
             </p>
+            {streak > 0 && (
+              <div className="title-streak" title="Серия дней практики подряд">
+                <Flame size={16} />
+                {streak} {streak % 10 === 1 && streak % 100 !== 11
+                  ? "день"
+                  : streak % 10 >= 2 && streak % 10 <= 4 && (streak % 100 < 12 || streak % 100 > 14)
+                    ? "дня"
+                    : "дней"}{" "}
+                подряд
+              </div>
+            )}
             <div className="title-actions">
               <button
                 className="btn primary big"
@@ -470,7 +491,6 @@ export default function Home() {
                   setStats({});
                   setSessionsCount(0);
                   setStreak(0);
-                  schedulePush(); // propagate the reset tombstone to other devices
                 }}
               />
             </div>

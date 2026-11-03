@@ -34,7 +34,9 @@ const PAD_KEY: Record<string, PadId> = { KeyQ: "tl", KeyE: "tr", KeyZ: "bl", Key
 
 const otherDiag = (d: Diag): Diag => (d === "main" ? "anti" : "main");
 
-export function CrossGame(props: { onDone: (r: GameResult) => void }) {
+export function CrossGame(props: { onDone: (r: GameResult) => void; rounds?: number }) {
+  /** Run length picked on the ready gate (default from config). */
+  const totalRounds = props.rounds ?? CROSS.ROUNDS;
   const [phase, setPhase] = useState<Phase>("ready");
   const [cue, setCue] = useState<Diag>("main");
   const [hits, setHits] = useState<PadId[]>([]);
@@ -79,7 +81,7 @@ export function CrossGame(props: { onDone: (r: GameResult) => void }) {
     props.onDone({
       game: "cross",
       score: s.score,
-      detail: `${s.score} из ${CROSS.ROUNDS} диагоналей · ошибок ${s.strikes}`,
+      detail: `${s.score} из ${totalRounds} диагоналей · ошибок ${s.strikes}`,
     });
   }, [props]);
 
@@ -87,7 +89,7 @@ export function CrossGame(props: { onDone: (r: GameResult) => void }) {
     (roundNo: number) => {
       const s = ref.current;
       if (s.done) return;
-      if (roundNo >= CROSS.ROUNDS) {
+      if (roundNo >= totalRounds) {
         finish();
         return;
       }
@@ -98,7 +100,7 @@ export function CrossGame(props: { onDone: (r: GameResult) => void }) {
       s.hits.clear();
       s.window = Math.max(
         CROSS.MIN_WINDOW,
-        CROSS.START_WINDOW - roundNo * ((CROSS.START_WINDOW - CROSS.MIN_WINDOW) / CROSS.ROUNDS),
+        CROSS.START_WINDOW - roundNo * ((CROSS.START_WINDOW - CROSS.MIN_WINDOW) / totalRounds),
       );
       s.phase = "input";
       setCue(next);
@@ -230,7 +232,7 @@ export function CrossGame(props: { onDone: (r: GameResult) => void }) {
       <div className="cross-status">
         <div className="cross-cue">{statusText}</div>
         <div className="cross-meta">
-          пара {Math.min(round + 1, CROSS.ROUNDS)} из {CROSS.ROUNDS} · верно {score} · ошибки{" "}
+          пара {Math.min(round + 1, totalRounds)} из {totalRounds} · верно {score} · ошибки{" "}
           {strikes}/3
         </div>
       </div>

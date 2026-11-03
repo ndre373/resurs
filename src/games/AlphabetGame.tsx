@@ -33,7 +33,9 @@ function randomTrial(prev?: Trial): Trial {
   return t;
 }
 
-export function AlphabetGame(props: { onDone: (r: GameResult) => void }) {
+export function AlphabetGame(props: { onDone: (r: GameResult) => void; rounds?: number }) {
+  /** Run length picked on the ready gate (default from config). */
+  const totalRounds = props.rounds ?? ALPHABET.ROUNDS;
   const [trial, setTrial] = useState<Trial>(() => randomTrial());
   const [round, setRound] = useState(1);
   const [streak, setStreak] = useState(0);
@@ -78,14 +80,14 @@ export function AlphabetGame(props: { onDone: (r: GameResult) => void }) {
     props.onDone({
       game: "alphabet",
       score: s.correct,
-      detail: `${s.correct}/${ALPHABET.ROUNDS} верно · реакция ${avg} мс`,
+      detail: `${s.correct}/${totalRounds} верно · реакция ${avg} мс`,
       reactionMs: avg > 0 ? avg : undefined,
     });
   }, [props]);
 
   const nextRound = useCallback(() => {
     const s = stateRef.current;
-    if (s.round >= ALPHABET.ROUNDS) {
+    if (s.round >= totalRounds) {
       finish();
       return;
     }
@@ -207,10 +209,10 @@ export function AlphabetGame(props: { onDone: (r: GameResult) => void }) {
 
       <div className="alphabet-progress">
         <div className="progress-track">
-          <div className="progress-fill" style={{ width: `${((round - 1) / ALPHABET.ROUNDS) * 100}%` }} />
+          <div className="progress-fill" style={{ width: `${((round - 1) / totalRounds) * 100}%` }} />
         </div>
         <span>
-          {round}/{ALPHABET.ROUNDS} · серия {streak} · верно {correct}
+          {round}/{totalRounds} · серия {streak} · верно {correct}
         </span>
       </div>
 

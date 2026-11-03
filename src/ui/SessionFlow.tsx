@@ -8,7 +8,6 @@ import { useState } from "react";
 import { Sparkles, ArrowRight } from "lucide-react";
 import type { GameId, GameResult } from "@/game/types";
 import { recordResult, recordSession } from "@/game/stats";
-import { schedulePush } from "@/game/sync";
 import { GAME_META } from "@/games/meta";
 import { BreathGame } from "@/games/BreathGame";
 import { MirrorGame } from "@/games/MirrorGame";
@@ -61,7 +60,6 @@ export function SessionFlow(props: { onExit: () => void }) {
       games: results.map((r) => r.game),
       results,
     });
-    schedulePush(); // cloud backup when a sync code is connected
   };
 
   return (

@@ -5,17 +5,10 @@
  */
 
 import { useState } from "react";
-import { Flame, CalendarDays, Sparkles, CloudUpload, CloudDownload, Unlink, TrendingDown, TrendingUp } from "lucide-react";
+import { Flame, CalendarDays, Sparkles, Copy, Share2, TrendingDown, TrendingUp } from "lucide-react";
 import { dayKey, getActivityDays, getHistory, getSessions, getStats, getStreak } from "@/game/stats";
 import type { GameId } from "@/game/types";
-import {
-  connectCloudSync,
-  createCloudSync,
-  getSyncCode,
-  pullFromCloud,
-  pushToCloud,
-  setSyncCode,
-} from "@/game/sync";
+import { applyTransferCode, createTransferCode } from "@/game/sync";
 import { GAME_META, GAME_ORDER } from "@/games/meta";
 
 function plural(n: number, one: string, few: string, many: string): string {
@@ -124,116 +117,96 @@ export function ProgressView(props: { onChanged?: () => void }) {
   );
 }
 
-/** Cloud sync by code: backup stats and merge them across devices. */
+/**
+ * Перенос статистики между устройствами без сервера: приложение упаковывает
+ * все данные в код переноса, пользователь вставляет его на другом устройстве.
+ */
 function SyncCard(props: { onChanged: () => void }) {
-  const [code, setCode] = useState<string | null>(getSyncCode());
+  const [code, setCode] = useState("");
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
 
-  const run = async (fn: () => Promise<string>) => {
+  const create = async () => {
     setBusy(true);
     setNote("");
     try {
-      setNote(await fn());
+      setCode(await createTransferCode());
+      setNote("Код готов — скопируйте его и вставьте на другом устройстве.");
     } finally {
       setBusy(false);
     }
   };
 
-  const create = () =>
-    run(async () => {
-      const c = await createCloudSync();
-      if (!c) return "Не удалось связаться с облаком — попробуйте позже.";
-      setCode(c);
-      return "Код создан — статистика сохранена в облаке.";
-    });
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setNote("Код скопирован — отправьте его себе в мессенджер или заметки.");
+    } catch {
+      setNote("Не получилось скопировать автоматически — выделите код и скопируйте вручную.");
+    }
+  };
 
-  const connect = () =>
-    run(async () => {
-      const c = input.trim().toUpperCase();
-      if (c.length < 4) return "Введите код с другого устройства.";
-      const r = await connectCloudSync(c);
-      if (r === "error") return "Не удалось связаться с облаком — попробуйте позже.";
-      if (r === "empty") {
-        setSyncCode(null);
-        return "Такой код не найден. Проверьте буквы.";
+  const apply = async () => {
+    setBusy(true);
+    setNote("");
+    try {
+      const r = await applyTransferCode(input);
+      if (r === "merged") {
+        setInput("");
+        props.onChanged();
+        setNote("Готово — статистика объединена, лучшие результаты сохранены.");
+      } else {
+        setNote("Код не распознан. Скопируйте его целиком — от «R1.» и до конца.");
       }
-      setCode(c);
-      props.onChanged();
-      return "Готово — статистика объединена с этим устройством.";
-    });
-
-  const push = () =>
-    run(async () =>
-      (await pushToCloud()) ? "Статистика отправлена в облако." : "Нет связи с облаком.",
-    );
-
-  const pull = () =>
-    run(async () => {
-      const r = await pullFromCloud();
-      if (r === "merged") props.onChanged();
-      return r === "merged"
-        ? "Данные из облака объединены."
-        : r === "empty"
-          ? "В облаке под этим кодом пока пусто."
-          : "Нет связи с облаком.";
-    });
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <div className="sync-card">
-      <h3 className="progress-h">Облачная синхронизация</h3>
+      <h3 className="progress-h">Перенос на другое устройство</h3>
+      <p className="session-text">
+        Статистика хранится только на этом устройстве. Код переноса содержит все ваши данные —
+        создайте его здесь и вставьте на другом устройстве. Интернет не нужен.
+      </p>
       {code ? (
         <>
-          <p className="session-text">
-            Ваш код: <b className="sync-code">{code}</b> — введите его на другом устройстве, чтобы
-            перенести прогресс.
-          </p>
+          <textarea
+            className="intent-input sync-codebox"
+            readOnly
+            rows={4}
+            value={code}
+            onFocus={(e) => e.target.select()}
+          />
           <div className="chips">
-            <button className="chip" disabled={busy} onClick={push}>
-              <CloudUpload size={14} /> Отправить
+            <button className="chip on" onClick={copy}>
+              <Copy size={14} /> Скопировать код
             </button>
-            <button className="chip" disabled={busy} onClick={pull}>
-              <CloudDownload size={14} /> Забрать
-            </button>
-            <button
-              className="chip"
-              disabled={busy}
-              onClick={() => {
-                setSyncCode(null);
-                setCode(null);
-                setNote("Синхронизация отключена — данные остались на устройстве.");
-              }}
-            >
-              <Unlink size={14} /> Отключить
+            <button className="chip" onClick={() => setCode("")}>
+              Скрыть
             </button>
           </div>
         </>
       ) : (
-        <>
-          <p className="session-text">
-            Статистика хранится только в этом браузере. Создайте код — и прогресс будет
-            подхватываться на других устройствах.
-          </p>
-          <div className="chips">
-            <button className="chip on" disabled={busy} onClick={create}>
-              <CloudUpload size={14} /> Создать код
-            </button>
-          </div>
-          <div className="sync-connect">
-            <input
-              className="intent-input"
-              placeholder="или введите код с другого устройства"
-              value={input}
-              onChange={(e) => setInput(e.target.value.toUpperCase())}
-              maxLength={12}
-            />
-            <button className="chip" disabled={busy} onClick={connect}>
-              Подключить
-            </button>
-          </div>
-        </>
+        <div className="chips">
+          <button className="chip on" disabled={busy} onClick={create}>
+            <Share2 size={14} /> Создать код переноса
+          </button>
+        </div>
       )}
+      <div className="sync-connect">
+        <input
+          className="intent-input"
+          placeholder="вставьте код с другого устройства"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+        />
+        <button className="chip" disabled={busy || !input.trim()} onClick={apply}>
+          Перенести
+        </button>
+      </div>
       {note && <p className="sync-note">{note}</p>}
     </div>
   );

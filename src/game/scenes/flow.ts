@@ -125,11 +125,34 @@ export class FlowScene implements GameScene {
     // finger is on the screen, and a mouse should steer by simply moving —
     // holding the button down is not required.
     if (kind === "up") return;
-    // NDC → world plane at z=0, clamped to the corridor
+    // NDC → world plane at z=0, clamped to the corridor that is actually
+    // VISIBLE on this screen (the corridor width follows the camera aspect)
+    const reach = this.orbReach();
     this.target.set(
-      THREE.MathUtils.clamp(x * 5.2, -4, 4),
+      THREE.MathUtils.clamp(x * reach, -reach, reach),
       THREE.MathUtils.clamp(1.6 + y * 3.4, 0.3, 4.4),
     );
+  }
+
+  /**
+   * Visible half-width at the judgement plane (z=0). The camera FOV is
+   * vertical, so a portrait phone (aspect ≈ 0.47) sees only ≈ ±1.5 m there,
+   * while a wide desktop sees ±5.6 m. Ring centers and the steering clamp are
+   * derived from this — otherwise edge rings are off-screen and unhittable.
+   */
+  private halfWidth(): number {
+    const cam = this.ctx.camera;
+    return Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)) * cam.aspect * 5.2;
+  }
+
+  /** How far the spark may steer sideways — stays inside the visible frame. */
+  private orbReach(): number {
+    return Math.min(4, Math.max(0.8, this.halfWidth() - 0.4));
+  }
+
+  /** Ring centers: far enough apart to be interesting, never beyond reach. */
+  private ringSpan(): number {
+    return Math.min(3.6, Math.max(0.6, this.halfWidth() - 0.5));
   }
 
   private spawnCount = 0;
@@ -159,7 +182,7 @@ export class FlowScene implements GameScene {
       }),
     );
     const center = new THREE.Vector2(
-      (Math.random() - 0.5) * 7.2,
+      (Math.random() - 0.5) * 2 * this.ringSpan(),
       0.6 + Math.random() * 3.6,
     );
     mesh.position.set(center.x, center.y, this.spawnZ);

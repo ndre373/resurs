@@ -95,6 +95,13 @@ export class BreathScene implements GameScene {
 
     this.group.position.set(0, 1.4, 0);
     this.group.rotation.x = 0.35;
+    // fit the lotus into the visible width: petal tips reach ≈ ±3.15 m, but a
+    // portrait phone (vertical FOV) shows only ≈ ±1.8 m at this distance —
+    // shrink the whole flower rather than cropping the outer petals
+    const cam = ctx.camera;
+    const halfW = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)) * cam.aspect * 6.5;
+    const fit = Math.min(1, (halfW * 0.95) / 3.15);
+    if (fit < 1) this.group.scale.setScalar(fit);
     ctx.scene.add(this.group);
     ctx.camera.position.set(0, 2.2, 6.5);
     ctx.camera.lookAt(0, 1.4, 0);

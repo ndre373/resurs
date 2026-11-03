@@ -1,107 +1,69 @@
 /**
- * sync.ts — cloud backup of practice stats behind a short sync code.
- * Talks to the tRPC `sync` router with plain fetch (superjson wire format)
- * so game modules need no React context. Offline simply means «local only».
+ * sync.ts — перенос статистики между устройствами БЕЗ сервера.
+ *
+ * The app is hosted on static hosting (GitHub Pages) — there is no backend to
+ * store anything. Instead the whole stats payload is packed into a portable
+ * «код переноса»: JSON → gzip → base64url. The user copies the code to the
+ * other device (messenger, notes) and pastes it there. Works fully offline.
+ * Merging is idempotent (see stats.mergePayload) — applying the same code
+ * twice changes nothing, and the better results always win.
  */
 
-import { exportPayload, mergePayload } from "./stats";
-import { storage } from "./storage";
+import { exportPayload, mergePayload, type StatsPayload } from "./stats";
 
-const CODE_KEY = "syncCode";
-
-/** Unguessable but typeable: no 0/O, 1/I/L confusion. */
-const ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
-
-export function generateSyncCode(): string {
-  const rnd = new Uint8Array(8);
-  crypto.getRandomValues(rnd);
-  return [...rnd].map((b) => ALPHABET[b % ALPHABET.length]).join("");
+function base64urlEncode(bytes: Uint8Array): string {
+  let bin = "";
+  const CHUNK = 0x8000; // String.fromCharCode has an argument-count limit
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-export function getSyncCode(): string | null {
-  return storage.get<string | null>(CODE_KEY, null);
+function base64urlDecode(s: string): Uint8Array {
+  const bin = atob(s.replace(/-/g, "+").replace(/_/g, "/"));
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
 }
 
-export function setSyncCode(code: string | null): void {
-  if (code) storage.set(CODE_KEY, code.toUpperCase());
-  else storage.remove(CODE_KEY);
-}
-
-// ---- minimal tRPC client (superjson wire format) --------------------------
-
-async function trpcGet<T>(path: string, input: unknown): Promise<T | null> {
-  const res = await fetch(
-    `/api/trpc/${path}?input=${encodeURIComponent(JSON.stringify({ json: input }))}`,
-    { credentials: "include" },
-  );
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const body = await res.json();
-  return (body?.result?.data?.json ?? null) as T | null;
-}
-
-async function trpcPost<T>(path: string, input: unknown): Promise<T | null> {
-  const res = await fetch(`/api/trpc/${path}`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    credentials: "include",
-    body: JSON.stringify({ json: input }),
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const body = await res.json();
-  return (body?.result?.data?.json ?? null) as T | null;
-}
-
-// ---- public API ------------------------------------------------------------
-
-export async function pushToCloud(): Promise<boolean> {
-  const code = getSyncCode();
-  if (!code) return false;
+/** Pack the local stats into a portable transfer code. */
+export async function createTransferCode(): Promise<string> {
+  const payload: StatsPayload = exportPayload();
+  // keep the code compact: the reaction chart only reads the recent plays
+  payload.history = payload.history?.slice(-60);
+  const bytes = new TextEncoder().encode(JSON.stringify(payload));
   try {
-    await trpcPost("sync.save", { code, payload: JSON.stringify(exportPayload()) });
-    return true;
+    const stream = new Blob([bytes as BlobPart])
+      .stream()
+      .pipeThrough(new CompressionStream("gzip"));
+    const packed = new Uint8Array(await new Response(stream).arrayBuffer());
+    return "R1." + base64urlEncode(packed);
   } catch {
-    return false;
+    // very old browsers without CompressionStream — plain encoding still works
+    return "R0." + base64urlEncode(bytes);
   }
 }
 
-export type PullResult = "merged" | "empty" | "error";
+export type ApplyResult = "merged" | "error";
 
-/** Pull the cloud payload and merge it into local stats. */
-export async function pullFromCloud(): Promise<PullResult> {
-  const code = getSyncCode();
-  if (!code) return "error";
+/** Apply a transfer code created on another device; stats are merged, never overwritten. */
+export async function applyTransferCode(code: string): Promise<ApplyResult> {
+  const m = code.trim().match(/^(R[01])\.([A-Za-z0-9_-]+)$/);
+  if (!m) return "error";
   try {
-    const row = await trpcGet<{ payload: string }>("sync.load", { code });
-    if (!row) return "empty";
-    mergePayload(JSON.parse(row.payload));
+    let bytes = base64urlDecode(m[2]);
+    if (m[1] === "R1") {
+      const stream = new Blob([bytes as BlobPart])
+        .stream()
+        .pipeThrough(new DecompressionStream("gzip"));
+      bytes = new Uint8Array(await new Response(stream).arrayBuffer());
+    }
+    const payload = JSON.parse(new TextDecoder().decode(bytes)) as StatsPayload;
+    if (!payload || typeof payload !== "object" || !payload.stats) return "error";
+    mergePayload(payload);
     return "merged";
   } catch {
     return "error";
   }
-}
-
-/** Create a fresh code, store it and push the current stats up. */
-export async function createCloudSync(): Promise<string | null> {
-  const code = generateSyncCode();
-  setSyncCode(code);
-  const ok = await pushToCloud();
-  if (!ok) {
-    setSyncCode(null);
-    return null;
-  }
-  return code;
-}
-
-/** Connect to an existing code and pull its data down. */
-export async function connectCloudSync(code: string): Promise<PullResult> {
-  setSyncCode(code);
-  return pullFromCloud();
-}
-
-// Debounced auto-push after a finished game/session.
-let pushTimer: ReturnType<typeof setTimeout> | null = null;
-export function schedulePush(): void {
-  if (!getSyncCode()) return;
-  if (pushTimer) clearTimeout(pushTimer);
-  pushTimer = setTimeout(() => void pushToCloud(), 2500);
 }
