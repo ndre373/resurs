@@ -4,7 +4,7 @@
  * exercise duration, and data management (progress/sync, stats reset).
  */
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   Music,
   Mic,
@@ -17,9 +17,11 @@ import {
   Flame,
   Trash2,
   Info,
+  RefreshCw,
 } from "lucide-react";
 import { controller } from "@/game/boot";
 import { voice } from "@/game/voice";
+import { checkPwaUpdate, getSwVersion } from "@/pwa";
 import {
   getDefaultDuration,
   setDefaultDuration,
@@ -101,6 +103,23 @@ export function SettingsView(props: {
   const [voiceVol, setVoiceVol] = useState(voice.speechVolume);
   const [haptics, setHaptics] = useState(hapticsEnabled());
   const [duration, setDuration] = useState(getDefaultDuration());
+  // installed worker version + «checking…» state for the manual update button
+  const [swVer, setSwVer] = useState<string | null>(getSwVersion());
+  const [checking, setChecking] = useState(false);
+
+  useEffect(() => {
+    const onVer = (e: Event) => setSwVer((e as CustomEvent<string>).detail);
+    window.addEventListener("pwa:version", onVer);
+    return () => window.removeEventListener("pwa:version", onVer);
+  }, []);
+
+  const checkUpdates = () => {
+    controller.audio.sfx("ui");
+    setChecking(true);
+    checkPwaUpdate();
+    // if nothing new is found within 4 seconds, report «already latest»
+    window.setTimeout(() => setChecking(false), 4000);
+  };
 
   return (
     <div className="settings-view">
@@ -190,6 +209,24 @@ export function SettingsView(props: {
             ))}
           </div>
         </div>
+      </Section>
+
+      <Section title="Обновления">
+        <button className="settings-row" onClick={checkUpdates} disabled={checking}>
+          <span className="settings-row-icon">
+            <RefreshCw size={18} className={checking ? "spin" : undefined} />
+          </span>
+          <span className="settings-row-text">
+            <span className="settings-row-title">
+              {checking ? "Проверяем…" : "Проверить обновления"}
+            </span>
+            <span className="settings-row-sub">
+              {swVer
+                ? `установлена версия ${swVer} · если появится новая — всплывёт плашка «Обновить»`
+                : "версия определяется… приложение проверяет обновления само"}
+            </span>
+          </span>
+        </button>
       </Section>
 
       <Section title="Данные">

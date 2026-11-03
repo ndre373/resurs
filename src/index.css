@@ -747,6 +747,9 @@ input, textarea { user-select: text; }
   animation: fadeIn 0.25s ease;
 }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 .modal-card {
   display: flex;
   flex-direction: column;
