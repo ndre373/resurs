@@ -388,6 +388,7 @@ export default function Home() {
                         </button>
                       ))}
                     </div>
+                    <div className="ready-hint">{GAME_META[game].diffHint[difficulty]}</div>
                   </div>
                   <button
                     className="btn primary big"

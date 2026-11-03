@@ -28,10 +28,10 @@ const LENGTHS = [
 ] as const;
 
 /** Difficulty tiers — same choices as on the game ready gate. */
-const DIFFICULTIES: { id: Difficulty; label: string }[] = [
-  { id: "easy", label: "Лёгкая" },
-  { id: "mid", label: "Средняя" },
-  { id: "hard", label: "Сложная" },
+const DIFFICULTIES: { id: Difficulty; label: string; hint: string }[] = [
+  { id: "easy", label: "Лёгкая", hint: "мягкий темп, больше времени на ответ, длинные подсказки дыхания" },
+  { id: "mid", label: "Средняя", hint: "классический баланс темпа и подсказок" },
+  { id: "hard", label: "Сложная", hint: "быстрый темп, короткие окна, минимум подсказок" },
 ];
 
 type Step = "intention" | "breath" | "active" | "mirror" | "done";
@@ -153,6 +153,9 @@ export function SessionFlow(props: { onExit: () => void }) {
                   {d.label}
                 </button>
               ))}
+            </div>
+            <div className="ready-hint">
+              {DIFFICULTIES.find((d) => d.id === difficulty)?.hint}
             </div>
           </div>
           <div className="modal-actions">
