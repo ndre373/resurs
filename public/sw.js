@@ -1,10 +1,30 @@
 /* sw.js — offline shell for the «Ресурс» app.
  * Network-first for documents (fresh deploys win), cache-first for hashed
- * build assets and icons. No external requests are cached. */
-const CACHE = "resurs-v23";
+ * build assets and icons. No external requests are cached.
+ * The FULL precache list (every built file, lazy chunks included) is generated
+ * at build time into sw-assets.js — the app works offline from the first visit. */
+const CACHE = "resurs-v24";
+
+// generated at build time by scripts/gen-sw-assets.mjs; absent in local dev
+let GENERATED = [];
+try {
+  importScripts("./sw-assets.js");
+  GENERATED = self.SW_ASSETS ?? [];
+} catch {
+  GENERATED = [];
+}
 // scope-relative paths: the same worker works from the domain root (local
 // server) and from a subpath (GitHub Pages serves the app at /resurs/)
-const SHELL = ["./", "index.html", "manifest.webmanifest", "icon-192.png", "icon-512.png"];
+const SHELL = [
+  ...new Set([
+    "./",
+    "index.html",
+    "manifest.webmanifest",
+    "icon-192.png",
+    "icon-512.png",
+    ...GENERATED,
+  ]),
+];
 
 self.addEventListener("install", (e) => {
   // precache the shell, then wait — the page decides when to activate
