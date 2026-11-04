@@ -894,6 +894,27 @@ input, textarea { user-select: text; }
 }
 .pattern-chips .chip { backdrop-filter: blur(10px); }
 
+/* breath screen: the two chip rows (rhythm + visual) stack in one container
+   instead of overlapping at the same absolute position */
+.breath-choices {
+  position: absolute;
+  bottom: 60px;
+  left: 0;
+  right: 0;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+}
+.breath-choices .pattern-chips { position: static; }
+.chips-caption {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
 /* hold phase of the breathing pacer */
 .breath-phase.hold { color: #fbbf24; text-shadow: 0 0 40px rgba(251, 191, 36, 0.45); }
 

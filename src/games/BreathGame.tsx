@@ -174,35 +174,37 @@ export function BreathGame(props: {
         <div className="breath-cycles">{cyclesText}</div>
       </div>
       {!sessionMode && (
-        <div className="pattern-chips" role="group" aria-label="Ритм дыхания">
-          {BREATH_PATTERNS.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              className={`chip ${p.id === patternId ? "on" : ""}`}
-              onClick={() => setPatternId(p.id)}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-      )}
-      {!sessionMode && (
-        <div className="pattern-chips" role="group" aria-label="Образ дыхания">
-          {VISUALS.map((v) => (
-            <button
-              key={v.id}
-              type="button"
-              className={`chip ${v.id === visualId ? "on" : ""}`}
-              onClick={() => {
-                controller.audio.sfx("ui");
-                setVisualId(v.id);
-                storage.set(VISUAL_KEY, v.id);
-              }}
-            >
-              {v.label}
-            </button>
-          ))}
+        <div className="breath-choices">
+          <div className="chips-caption">Ритм</div>
+          <div className="pattern-chips" role="group" aria-label="Ритм дыхания">
+            {BREATH_PATTERNS.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                className={`chip ${p.id === patternId ? "on" : ""}`}
+                onClick={() => setPatternId(p.id)}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <div className="chips-caption">Образ</div>
+          <div className="pattern-chips" role="group" aria-label="Образ дыхания">
+            {VISUALS.map((v) => (
+              <button
+                key={v.id}
+                type="button"
+                className={`chip ${v.id === visualId ? "on" : ""}`}
+                onClick={() => {
+                  controller.audio.sfx("ui");
+                  setVisualId(v.id);
+                  storage.set(VISUAL_KEY, v.id);
+                }}
+              >
+                {v.label}
+              </button>
+            ))}
+          </div>
         </div>
       )}
       {endless && (
