@@ -17,11 +17,21 @@ import {
   type BreathPhase,
 } from "@/game/breathPatterns";
 import type { BreathState } from "@/game/scenes/breath";
+import type { BreathVisual } from "@/game/scenes/breath";
+import { storage } from "@/game/storage";
 import { HowTo } from "@/ui/common";
 import { getDefaultDuration } from "@/game/settings";
 import { BREATH_DIFF } from "@/game/config";
 
 const cycleSeconds = (p: BreathPattern): number => p.steps.reduce((s, x) => s + x.sec, 0);
+
+/** Breathing visuals — all three breathe with the same openness curve. */
+const VISUALS: { id: BreathVisual; label: string }[] = [
+  { id: "lotus", label: "Лотос" },
+  { id: "spiral", label: "Спираль" },
+  { id: "ripples", label: "Круги" },
+];
+const VISUAL_KEY = "breathVisual";
 
 /** Minutes → breath cycles for the given pattern. 0 minutes = endless. */
 const cyclesFor = (minutes: number, p: BreathPattern): number =>
@@ -69,6 +79,9 @@ export function BreathGame(props: {
   const sessionMode = props.cycles !== undefined;
   const minutes = props.durationMin ?? getDefaultDuration();
   const [patternId, setPatternId] = useState(BREATH_PATTERNS[0].id);
+  const [visualId, setVisualId] = useState<BreathVisual>(() =>
+    storage.get<BreathVisual>(VISUAL_KEY, "lotus"),
+  );
   const stateRef = useRef<BreathState | null>(null);
   stateRef.current = state;
 
@@ -99,6 +112,7 @@ export function BreathGame(props: {
     controller.enterScene("breath", {
       cycles: sessionMode ? props.cycles : cyclesFor(minutes, p),
       breathPattern: p,
+      breathVisual: sessionMode ? "lotus" : visualId,
     });
     voice.setContext("breath");
     return () => {
@@ -109,7 +123,7 @@ export function BreathGame(props: {
       voice.setContext(null);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [minutes, patternId]);
+  }, [minutes, patternId, visualId]);
 
   const finishEndless = () => {
     const done = stateRef.current?.cycle ?? 0;
@@ -145,11 +159,13 @@ export function BreathGame(props: {
     <div className="game-stage overlay-pass">
       <HowTo>
         <p>
-          Следуйте за лотосом: он раскрывается — <b>вдох</b>, закрывается — <b>выдох</b>, замирает —{" "}
-          <b>задержка</b>. Смена фазы отдаётся лёгкой вибрацией (на Android) — можно дышать с
-          закрытыми глазами. Выберите ритм: когерентное дыхание (5·5) переключает нервную систему в
-          ресурсный режим, 4-7-8 глубоко расслабляет, «квадрат» собирает внимание. Суфлёр ведёт
-          первые циклы, потом затихает — дыхание продолжается само.
+          Следуйте за образом: он раскрывается — <b>вдох</b>, собирается — <b>выдох</b>, замирает —{" "}
+          <b>задержка</b>. Образ на выбор: разноцветный <b>лотос</b>, гипнотическая{" "}
+          <b>спираль</b> или <b>круги на воде</b> — все дышат вместе с вами. Смена фазы отдаётся
+          лёгкой вибрацией (на Android) — можно дышать с закрытыми глазами. Выберите ритм:
+          когерентное дыхание (5·5) переключает нервную систему в ресурсный режим, 4-7-8 глубоко
+          расслабляет, «квадрат» собирает внимание. Суфлёр ведёт первые циклы, потом затихает —
+          дыхание продолжается само.
         </p>
       </HowTo>
       <div className="breath-hud">
@@ -167,6 +183,24 @@ export function BreathGame(props: {
               onClick={() => setPatternId(p.id)}
             >
               {p.label}
+            </button>
+          ))}
+        </div>
+      )}
+      {!sessionMode && (
+        <div className="pattern-chips" role="group" aria-label="Образ дыхания">
+          {VISUALS.map((v) => (
+            <button
+              key={v.id}
+              type="button"
+              className={`chip ${v.id === visualId ? "on" : ""}`}
+              onClick={() => {
+                controller.audio.sfx("ui");
+                setVisualId(v.id);
+                storage.set(VISUAL_KEY, v.id);
+              }}
+            >
+              {v.label}
             </button>
           ))}
         </div>

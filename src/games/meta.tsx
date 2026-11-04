@@ -69,7 +69,7 @@ export const GAME_META: Record<GameId, GameMeta> = {
   breath: {
     id: "breath",
     title: "Дыхание",
-    subtitle: "лотос 5/5 — перезагрузка",
+    subtitle: "лотос · спираль · круги — 5/5",
     channels: ["кинестетика", "эмоции"],
     icon: <Wind size={26} />,
     accent: "#7dd3fc",

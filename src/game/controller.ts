@@ -14,6 +14,7 @@ import { COLORS } from "./config";
 import type { GameScene, SceneContext } from "./scene";
 import type { GameResult, SceneName } from "./types";
 import type { BreathPattern } from "./breathPatterns";
+import type { BreathVisual } from "./scenes/breath";
 import { voice } from "./voice";
 import { pauseBus } from "./pause";
 
@@ -196,6 +197,7 @@ class Controller {
       cycles?: number;
       durationSec?: number;
       breathPattern?: BreathPattern;
+      breathVisual?: BreathVisual;
       maxLen?: number;
       showMs?: number;
       speedScale?: number;
@@ -204,7 +206,7 @@ class Controller {
   ): Promise<GameScene> {
     if (name === "breath") {
       const m = await import("./scenes/breath");
-      return new m.BreathScene(opts?.cycles, opts?.breathPattern);
+      return new m.BreathScene(opts?.cycles, opts?.breathPattern, opts?.breathVisual);
     }
     if (name === "echo") {
       const m = await import("./scenes/echo");
@@ -225,6 +227,7 @@ class Controller {
       cycles?: number;
       durationSec?: number;
       breathPattern?: BreathPattern;
+      breathVisual?: BreathVisual;
       maxLen?: number;
       showMs?: number;
       speedScale?: number;
